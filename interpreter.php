@@ -37,12 +37,15 @@ class Interpreter
      * Read and return next character
      *
      * @param $toLower
+     * @param $allChars
      * @throws Exception
      * @return string|null
      */
-    protected function readChar($toLower = false)
+    protected function readChar($toLower = false, $allChars = false)
     {
-        $this->skipSpaces();
+        if (!$allChars) {
+            $this->skipSpaces();
+        }
         if ($this->pos >= strlen($this->src)) {
             return null;
         }
@@ -141,12 +144,14 @@ class Interpreter
             $varName = $char;
 
             // var name
-            while ($char = $this->readChar()) {
+            while ($char = $this->readChar(false, true)) {
                 if (preg_match('#[a-zA-Z0-9_]#', $char)) {
                     $varName .= $char;
                     continue;
                 }
-                $this->unreadChar();
+                if (!$this->isSpace($char)) {
+                    $this->unreadChar();
+                }
                 break;
             }
 
@@ -341,7 +346,7 @@ class Interpreter
         }
 
         $result = $this->evaluateExpression();
-        while ($result && ($operator = $this->readChar())) {
+        while ($operator = $this->readChar()) {
             switch ($operator) {
                 case '|':
                     $nextChar = $this->readChar();
