@@ -1,5 +1,10 @@
 <?php
 
+/**
+ * Class Interpreter
+ * @author Vasyl Voina <vasyl.voina@gmail.com>
+ */
+
 class Interpreter
 {
     /**
@@ -19,11 +24,20 @@ class Interpreter
      */
     protected $pos;
 
+    /**
+     * Check if character is considered as space character
+     *
+     * @param $str
+     * @return bool
+     */
     protected function isSpace($str)
     {
         return in_array($str, [" ","\n","\t","\r"]);
     }
 
+    /**
+     * We don't want to analyze space character, skip them
+     */
     protected function skipSpaces() : void
     {
         while($this->pos < strlen($this->src)
@@ -37,15 +51,12 @@ class Interpreter
      * Read and return next character
      *
      * @param $toLower
-     * @param $allChars
      * @throws Exception
      * @return string|null
      */
-    protected function readChar($toLower = false, $allChars = false)
+    protected function readChar($toLower = false)
     {
-        if (!$allChars) {
-            $this->skipSpaces();
-        }
+        $this->skipSpaces();
         if ($this->pos >= strlen($this->src)) {
             return null;
         }
@@ -72,6 +83,13 @@ class Interpreter
         } while ($numOfSteps > 0);
     }
 
+    /**
+     * Before math atom is returned, some pre operations can be performed
+     *
+     * @param $operator
+     * @param $val
+     * @return int
+     */
     protected function applyPreOperator($operator, $val)
     {
         switch ($operator) {
@@ -90,7 +108,13 @@ class Interpreter
         }
     }
 
-    protected function evaluateAtom()
+    /**
+     * The atomic (indivisible) part of math expression
+     *
+     * @return bool|int|mixed|string|null
+     * @throws Exception
+     */
+    protected function evaluateMathAtom()
     {
         $atom = null;
         $boolInversion = false;
@@ -104,9 +128,9 @@ class Interpreter
 
         // handle subexpression
         if ($char == '(') {
-            $atom = $this->evaluate();
+            $atom = $this->evaluateBoolStatement();
             if ($this->readChar() != ')') {
-                throw new Exception("Syntax error. Wrong number of parentheses.");
+                throw new Exception('Syntax error. Wrong number of parentheses.');
             }
             return $atom;
         }
@@ -144,43 +168,19 @@ class Interpreter
             $varName = $char;
 
             // var name
-            while ($char = $this->readChar(false, true)) {
+            while (!is_null($char = $this->readChar())) {
                 if (preg_match('#[a-zA-Z0-9_]#', $char)) {
                     $varName .= $char;
                     continue;
                 }
-                if (!$this->isSpace($char)) {
-                    $this->unreadChar();
-                }
+                $this->unreadChar();
                 break;
             }
 
             // The place where we can implement accessing object methods and properties
 
-            if ($char = $this->readChar()) {
-                // Possible statements before atom
-                if ($char == '=') {
-                    $nextChar = $this->readChar();
-                    // equality operator
-                    if ($nextChar == '=') {
-                        $this->unreadChar(2);
-                    } else {
-                        // variable assignment
-                        $this->unreadChar();
-                        $this->var[$varName] = $this->evaluate();
-                        if ($this->readChar() != ';') {
-                            throw new Exception('Syntax error. Wrong end of statement.');
-                        }
-                        // keep looking for atom
-                        return $this->evaluateAtom();
-                    }
-                } else {
-                    $this->unreadChar();
-                }
-            }
-
             if (!isset($this->var[$varName])) {
-                throw new Exception("Variable {$varName} does not exist.");
+                throw new Exception('Variable ' . $varName . ' does not exist.');
             }
 
             $atom = $this->var[$varName];
@@ -189,7 +189,7 @@ class Interpreter
         // number
         if (preg_match('#[0-9]#', $char)) {
             $atom = $char;
-            while ($char = $this->readChar()) {
+            while (!is_null($char = $this->readChar())) {
                 if (preg_match('#[0-9\.]#', $char)) {
                     $atom .= $char;
                     continue;
@@ -211,21 +211,23 @@ class Interpreter
     }
 
     /**
+     * Single math block
+     *
      * @return int
      */
-    protected function evaluateBlock()
+    protected function evaluateMathBlock()
     {
-        $result = $this->evaluateAtom();
-        while ($delimiter = $this->readChar()) {
-            switch ($delimiter) {
+        $result = $this->evaluateMathAtom();
+        while ($separator = $this->readChar()) {
+            switch ($separator) {
                 case '*':
-                    $result *= $this->evaluateAtom();
+                    $result *= $this->evaluateMathAtom();
                     break;
                 case '/':
-                    $result /= $this->evaluateAtom();
+                    $result /= $this->evaluateMathAtom();
                     break;
                 case '%':
-                    $result %= $this->evaluateAtom();
+                    $result %= $this->evaluateMathAtom();
                     break;
                 case '+':
                     $nextChar = $this->readChar();
@@ -260,83 +262,192 @@ class Interpreter
                 case ';':
                     $this->unreadChar();
                     return $result;
-                    break;
+                break;
                 default:
-                    throw new Exception('Unexpected operator ' . $delimiter . '.');
+                    throw new Exception('Unexpected operator ' . $separator . '.');
                 break;
             }
         }
         return $result;
     }
 
-    protected function evaluateExpression()
+    /**
+     * Single boolean expression that consists from one or more math blocks
+     *
+     * @return bool|int
+     * @throws Exception
+     */
+    protected function evaluateBoolExpression()
     {
-        $result = $this->evaluateBlock();
-
-        while ($operator = $this->readChar()) {
-            switch ($operator) {
+        $result = $this->evaluateMathBlock();
+        while ($separator = $this->readChar()) {
+            switch ($separator) {
                 case '+':
-                    $result += $this->evaluateBlock();
+                    $result += $this->evaluateMathBlock();
                     break;
                 case '-':
-                    $result -= $this->evaluateBlock();
+                    $result -= $this->evaluateMathBlock();
                     break;
                 case '=':
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
-                        $result = $result == $this->evaluateBlock();
+                        $result = $result == $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected operator ' . $operator . $nextChar . '.');
+                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
                     }
                     break;
                 case '!':
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
-                        $result = $result != $this->evaluateBlock();
+                        $result = $result != $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected operator ' . $operator . $nextChar . '.');
+                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
                     }
                     break;
                 case '>':
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
-                        $result = $result >= $this->evaluateBlock();
+                        $result = $result >= $this->evaluateMathBlock();
                     } else {
                         $this->unreadChar();
-                        $result = $result > $this->evaluateBlock();
+                        $result = $result > $this->evaluateMathBlock();
                     }
                     break;
                 case '<':
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
-                        $result = $result <= $this->evaluateBlock();
+                        $result = $result <= $this->evaluateMathBlock();
                     } else {
                         $this->unreadChar();
-                        $result = $result < $this->evaluateBlock();
+                        $result = $result < $this->evaluateMathBlock();
                     }
                     break;
                 // Lower lever operators
                 case '&':
                 case '|':
-                    // end of subexpression
+                // end of subexpression
                 case ')':
-                    // end of statement
+                // end of statement
                 case ';':
                     $this->unreadChar();
                     // return result from recursive call
                     return $result;
-                    break;
+                break;
                 default:
-                    throw new Exception('Unexpected operator ' . $operator . '.');
-                    break;
+                    throw new Exception('Unexpected operator ' . $separator . '.');
+                break;
             }
         }
         return $result;
     }
 
     /**
+     * One or more math boolean expression
+     *
+     * @return bool|int
+     * @throws Exception
+     */
+    protected function evaluateBoolStatement()
+    {
+        $result = $this->evaluateBoolExpression();
+        while ($separator = $this->readChar()) {
+            switch ($separator) {
+                case '|':
+                    $nextChar = $this->readChar();
+                    if ($nextChar == '|') {
+                        $nextResult = $this->evaluateBoolExpression();
+                        $result = $result || $nextResult;
+                    } else {
+                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
+                    }
+                break;
+                case '&':
+                    $nextChar = $this->readChar();
+                    if ($nextChar == '&') {
+                        $nextResult = $this->evaluateBoolExpression();
+                        $result = $result && $nextResult;
+                    } else {
+                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
+                    }
+                break;
+                // end of subexpression
+                case ')':
+                // end of statement
+                case ';':
+                    $this->unreadChar();
+                    // return result from recursive call
+                    return $result;
+                break;
+                default:
+                    throw new Exception('Unexpected operator ' . $separator . '.');
+                break;
+            }
+        }
+        return $result;
+    }
+
+    /**
+     * Determine statement type and evaluate it
+     *
+     * @return bool|int|null
+     * @throws Exception
+     */
+    protected function evaluateStatement()
+    {
+        $char = $this->readChar();
+        // handle variable assignment statement
+        if (preg_match('#[a-zA-Z]#', $char)) {
+            $varName = $char;
+            // var name
+            while (!is_null($char = $this->readChar())) {
+                if (preg_match('#[a-zA-Z0-9_]#', $char)) {
+                    $varName .= $char;
+                    continue;
+                }
+                $this->unreadChar();
+                break;
+            }
+
+            if (!is_null($char = $this->readChar())) {
+                if ($char == '=') {
+                    $nextChar = $this->readChar();
+                    // equality operator
+                    if ($nextChar == '=') {
+                        // unread last 2 chars
+                        $this->unreadChar(2);
+                        // unread variable name
+                        $this->unreadChar(strlen($varName));
+                    } else {
+                        // unread last char
+                        $this->unreadChar();
+                        // variable assignment
+                        $this->var[$varName] = $this->evaluateBoolStatement();
+                        return null;
+                    }
+                } else {
+                    // unread last char
+                    $this->unreadChar();
+                    // unread variable name
+                    $this->unreadChar(strlen($varName));
+                }
+            } else {
+                // unread variable name
+                $this->unreadChar(strlen($varName));
+            }
+        } else {
+            $this->unreadChar();
+        }
+
+        return $this->evaluateBoolStatement();
+    }
+
+    /**
+     * Evaluate program statements one by one.
+     * Statement can be variable assignment, return statement, boolean|math expression etc.
+     *
      * @param $code
      * @return mixed
+     * @throws Exception
      */
     public function evaluate($code = '')
     {
@@ -344,41 +455,20 @@ class Interpreter
             $this->src = $code;
             $this->pos = 0;
         }
-
-        $result = $this->evaluateExpression();
-        while ($operator = $this->readChar()) {
-            switch ($operator) {
-                case '|':
-                    $nextChar = $this->readChar();
-                    if ($nextChar == '|') {
-                        $nextResult = $this->evaluateExpression();
-                        $result = $result || $nextResult;
-                    } else {
-                        throw new Exception('Unexpected operator ' . $operator . $nextChar . '.');
-                    }
-                    break;
-                case '&':
-                    $nextChar = $this->readChar();
-                    if ($nextChar == '&') {
-                        $nextResult = $this->evaluateExpression();
-                        $result = $result && $nextResult;
-                    } else {
-                        throw new Exception('Unexpected operator ' . $operator . $nextChar . '.');
-                    }
-                    break;
-                // end of subexpression
-                case ')':
-                    // end of statement
+        $programResult = $this->evaluateStatement();
+        while ($separator = $this->readChar()) {
+            switch ($separator) {
                 case ';':
-                    $this->unreadChar();
-                    // return result from recursive call
-                    return $result;
-                    break;
+                    $statementResult = $this->evaluateStatement();
+                    if ($statementResult) {
+                        $programResult = $statementResult;
+                    }
+                break;
                 default:
-                    throw new Exception('Unexpected operator ' . $operator . '.');
+                    throw new Exception('Unexpected operator ' . $separator . '.');
                 break;
             }
         }
-        return $result;
+        return $programResult;
     }
 }

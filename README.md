@@ -9,10 +9,19 @@ Sometimes you just want to know how things work. Then you read about interpreter
 ## Usage
 
 ```
+<?php
+
+require_once 'interpreter.php';
+
 $inter = new Interpreter();
 try {
-    $res = $inter->evaluate('x = 5 + 6 * 7; x + 9');
-    echo (int) $res . "\n";
+    $res = $inter->evaluate(<<<CODE
+age = 18;
+height = 190 * 2;
+age + height * (2 + 3) - 70;
+CODE
+);
+    echo $res . "\n";
 } catch (Exception $e) {
     echo $e->getMessage();
 }
@@ -20,7 +29,7 @@ try {
 
 Output:
 ```
-56
+1848
 ```
 
 ## Conclusions
