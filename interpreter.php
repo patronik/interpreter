@@ -27,12 +27,13 @@ class Interpreter
     /**
      * Check if character is considered as space character
      *
-     * @param $str
+     * @param $char
      * @return bool
      */
-    protected function isSpace($str)
+    protected function isSpace($char)
     {
-        return in_array($str, [" ","\n","\t","\r"]);
+        // 33 last not visible ASCII character
+        return ord($char) < 33;
     }
 
     /**
@@ -51,12 +52,16 @@ class Interpreter
      * Read and return next character
      *
      * @param $toLower
+     * @param $allChars
      * @throws Exception
      * @return string|null
      */
-    protected function readChar($toLower = false)
+    protected function readChar($toLower = false, $allChars = false)
     {
-        $this->skipSpaces();
+        if (!$allChars) {
+            $this->skipSpaces();
+        }
+
         if ($this->pos >= strlen($this->src)) {
             return null;
         }
@@ -95,16 +100,16 @@ class Interpreter
         switch ($operator) {
             case '-' :
                 return -$val;
-                break;
+            break;
             case '+' :
                 return +$val;
-                break;
+            break;
             case '++' :
                 return ++$val;
-                break;
+            break;
             case '--' :
                 return --$val;
-                break;
+            break;
         }
     }
 
@@ -163,7 +168,7 @@ class Interpreter
             }
         }
 
-        // handle variable
+        // variable
         if (preg_match('#[a-zA-Z]#', $char)) {
             $varName = $char;
 
@@ -199,6 +204,36 @@ class Interpreter
             }
         }
 
+        // string in double quotes
+        if ($char == "\"") {
+            $atom = "";
+            while (!is_null($char = $this->readChar(false, true))) {
+                if ($char != "\"") {
+                    $atom .= $char;
+                    continue;
+                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
+                    $atom[strlen($atom) - 1] = "\"";
+                    continue;
+                }
+                break;
+            }
+        }
+
+        // string in single quotes
+        if ($char == "'") {
+            $atom = '';
+            while (!is_null($char = $this->readChar(false, true))) {
+                if ($char != "'") {
+                    $atom .= $char;
+                    continue;
+                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
+                    $atom[strlen($atom) - 1] = '\'';
+                    continue;
+                }
+                break;
+            }
+        }
+
         if ($preOperator) {
             $atom = $this->applyPreOperator($preOperator, $atom);
         }
@@ -226,9 +261,12 @@ class Interpreter
                 case '/':
                     $result /= $this->evaluateMathAtom();
                     break;
+                case '.':
+                    $result .= $this->evaluateMathAtom();
+                break;
                 case '%':
                     $result %= $this->evaluateMathAtom();
-                    break;
+                break;
                 case '+':
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
@@ -238,7 +276,7 @@ class Interpreter
                         $this->unreadChar(2);
                         return $result;
                     }
-                    break;
+                break;
                 case '-':
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
@@ -248,7 +286,7 @@ class Interpreter
                         $this->unreadChar(2);
                         return $result;
                     }
-                    break;
+                break;
                 // Lower lever operators
                 case '=':
                 case '!':
@@ -408,6 +446,8 @@ class Interpreter
                 break;
             }
 
+            // The place where we can implement accessing object methods and properties
+
             if (!is_null($char = $this->readChar())) {
                 if ($char == '=') {
                     $nextChar = $this->readChar();
@@ -469,6 +509,13 @@ class Interpreter
                 break;
             }
         }
+
+        // enforce semicolon in the end of last statement
+        $this->unreadChar();
+        if ($this->readChar() != ';') {
+            throw new Exception('Unexpected end of file.');
+        }
+
         return $programResult;
     }
 }
