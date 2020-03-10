@@ -18,7 +18,7 @@ try {
     $res = $inter->evaluate(<<<CODE
 age = 18;
 height = 190 * 2;
-age + height * (2 + 3) - 70;
+return age + height * (2 + 3) - 70;
 CODE
 );
     echo $res . "\n";
