@@ -529,17 +529,16 @@ class Interpreter
             $this->pos = 0;
         }
 
-        $programResult = null;
         $this->evaluateStatement();
         while ($separator = $this->readChar()) {
             switch ($separator) {
-            // TODO implement functions
-            /**
+                // TODO implement functions
+                /**
                 case '}':
                     $this->unreadChar();
-                    return $programResult;
+                    return;
                 break;
-             **/
+                **/
                 case ';':
                     list($statementType, $statementResult) = $this->evaluateStatement();
                     // return value from program
@@ -558,7 +557,5 @@ class Interpreter
         if ($this->readChar() != ';') {
             throw new Exception('Unexpected end of file.');
         }
-
-        return $programResult;
     }
 }
