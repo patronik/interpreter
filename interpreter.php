@@ -29,14 +29,6 @@ class Interpreter
     protected $pos;
 
     /**
-     * @param int $pos
-     */
-    public function setPos(int $pos): void
-    {
-        $this->pos = $pos;
-    }
-
-    /**
      * @param string $key
      * @param mixed $val
      */
@@ -519,15 +511,14 @@ class Interpreter
      * Statement can be variable assignment, return statement, boolean|math expression etc.
      *
      * @param $code
+     * @param $pos
      * @return mixed
      * @throws Exception
      */
-    public function evaluate($code = '')
+    public function evaluate($code = '', $pos = 0)
     {
-        if (!empty($code)) {
-            $this->src = $code;
-            $this->pos = 0;
-        }
+        $this->src = $code;
+        $this->pos = $pos;
 
         $this->evaluateStatement();
         while ($separator = $this->readChar()) {
