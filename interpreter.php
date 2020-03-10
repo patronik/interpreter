@@ -127,6 +127,127 @@ class Interpreter
     }
 
     /**
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function evaluateVariableAtom($char, &$atom)
+    {
+        // variable
+        $asciiCode = ord($char);
+        if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
+            || $asciiCode >= 97 && $asciiCode <= 122) // a-z
+        {
+            $varName = $char;
+            // var name
+            while (!is_null($char = $this->readChar(false, true))) {
+                $asciiCode = ord($char);
+                if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
+                    || $asciiCode >= 97 && $asciiCode <= 122 // a-z
+                    || $asciiCode >= 48 && $asciiCode <= 57 // 0-9
+                    || $asciiCode == 95) // _
+                {
+                    $varName .= $char;
+                    continue;
+                }
+                if (!$this->isSpace($char)) {
+                    $this->unreadChar();
+                }
+                break;
+            }
+            // The place where we can implement accessing object methods and properties
+            if (!isset($this->var[$varName])) {
+                throw new Exception('Variable ' . $varName . ' does not exist.');
+            }
+
+            $atom = $this->var[$varName];
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function evaluateSingleQuotedStringAtom($char, &$atom)
+    {
+        // string in single quotes
+        if ($char == "'") {
+            $atom = '';
+            while (!is_null($char = $this->readChar(false, true))) {
+                if ($char != "'") {
+                    $atom .= $char;
+                    continue;
+                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
+                    $atom[strlen($atom) - 1] = '\'';
+                    continue;
+                }
+                break;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function evaluateDoubleQuotedStringAtom($char, &$atom)
+    {
+        // string in double quotes
+        if ($char == "\"") {
+            $atom = "";
+            while (!is_null($char = $this->readChar(false, true))) {
+                if ($char != "\"") {
+                    $atom .= $char;
+                    continue;
+                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
+                    $atom[strlen($atom) - 1] = "\"";
+                    continue;
+                }
+                break;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function evaluateNumberAtom($char, &$atom)
+    {
+        // number
+        $asciiCode = ord($char);
+        if ($asciiCode >= 48 && $asciiCode <= 57) { // 0-9
+            $atom = $char;
+            while (!is_null($char = $this->readChar())) {
+                $asciiCode = ord($char);
+                if ($asciiCode >= 48 && $asciiCode <= 57 // 0-9
+                    || $asciiCode == 46) // .
+                {
+                    $atom .= $char;
+                    continue;
+                }
+                $this->unreadChar();
+                break;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * The atomic (indivisible) part of math expression
      *
      * @return bool|int|mixed|string|null
@@ -181,71 +302,11 @@ class Interpreter
             }
         }
 
-        // variable
-        if (preg_match('#[a-zA-Z]#', $char)) {
-            $varName = $char;
-
-            // var name
-            while (!is_null($char = $this->readChar(false, true))) {
-                if (preg_match('#[a-zA-Z0-9_]#', $char)) {
-                    $varName .= $char;
-                    continue;
+        if (!$this->evaluateVariableAtom($char, $atom)) {
+            if (!$this->evaluateNumberAtom($char, $atom)) {
+                if (!$this->evaluateSingleQuotedStringAtom($char, $atom)) {
+                    $this->evaluateDoubleQuotedStringAtom($char, $atom);
                 }
-                if (!$this->isSpace($char)) {
-                    $this->unreadChar();
-                }
-                break;
-            }
-
-            // The place where we can implement accessing object methods and properties
-
-            if (!isset($this->var[$varName])) {
-                throw new Exception('Variable ' . $varName . ' does not exist.');
-            }
-
-            $atom = $this->var[$varName];
-        }
-
-        // number
-        if (preg_match('#[0-9]#', $char)) {
-            $atom = $char;
-            while (!is_null($char = $this->readChar())) {
-                if (preg_match('#[0-9\.]#', $char)) {
-                    $atom .= $char;
-                    continue;
-                }
-                $this->unreadChar();
-                break;
-            }
-        }
-
-        // string in double quotes
-        if ($char == "\"") {
-            $atom = "";
-            while (!is_null($char = $this->readChar(false, true))) {
-                if ($char != "\"") {
-                    $atom .= $char;
-                    continue;
-                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
-                    $atom[strlen($atom) - 1] = "\"";
-                    continue;
-                }
-                break;
-            }
-        }
-
-        // string in single quotes
-        if ($char == "'") {
-            $atom = '';
-            while (!is_null($char = $this->readChar(false, true))) {
-                if ($char != "'") {
-                    $atom .= $char;
-                    continue;
-                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
-                    $atom[strlen($atom) - 1] = '\'';
-                    continue;
-                }
-                break;
             }
         }
 
@@ -449,11 +510,17 @@ class Interpreter
     {
         $char = $this->readChar();
         // handle variable assignment statement
-        if (preg_match('#[a-zA-Z]#', $char)) {
+        $asciiCode = ord($char);
+        if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
+            || $asciiCode >= 97 && $asciiCode <= 122) { // a-z
             $keyWord = $char;
             // var name
             while (!is_null($char = $this->readChar(false, true))) {
-                if (preg_match('#[a-zA-Z0-9_]#', $char)) {
+                $asciiCode = ord($char);
+                if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
+                    || $asciiCode >= 97 && $asciiCode <= 122 // a-z
+                    || $asciiCode >= 48 && $asciiCode <= 57 // 0-9
+                    || $asciiCode == 95) { // _
                     $keyWord .= $char;
                     continue;
                 }
@@ -520,7 +587,12 @@ class Interpreter
         $this->src = $code;
         $this->pos = $pos;
 
-        $this->evaluateStatement();
+        $statementResult = $this->evaluateStatement();
+        // return value from program
+        if ($this->returnFlag) {
+            $this->returnFlag = false;
+            return $statementResult;
+        }
         while ($separator = $this->readChar()) {
             switch ($separator) {
                 // TODO implement functions
