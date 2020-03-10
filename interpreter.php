@@ -128,13 +128,12 @@ class Interpreter
 
     /**
      * @param $char
-     * @param $atom
+     * @param $varName
      * @return bool
      * @throws Exception
      */
-    protected function evaluateVariableAtom($char, &$atom)
+    protected function parseVariableName($char, &$varName)
     {
-        // variable
         $asciiCode = ord($char);
         if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
             || $asciiCode >= 97 && $asciiCode <= 122) // a-z
@@ -156,11 +155,26 @@ class Interpreter
                 }
                 break;
             }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function evaluateVariableAtom($char, &$atom)
+    {
+        // variable
+        $varName = null;
+        if ($this->parseVariableName($char, $varName)) {
             // The place where we can implement accessing object methods and properties
             if (!isset($this->var[$varName])) {
                 throw new Exception('Variable ' . $varName . ' does not exist.');
             }
-
             $atom = $this->var[$varName];
             return true;
         }
@@ -509,27 +523,9 @@ class Interpreter
     protected function evaluateStatement()
     {
         $char = $this->readChar();
+        $keyWord = null;
         // handle variable assignment statement
-        $asciiCode = ord($char);
-        if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
-            || $asciiCode >= 97 && $asciiCode <= 122) { // a-z
-            $keyWord = $char;
-            // var name
-            while (!is_null($char = $this->readChar(false, true))) {
-                $asciiCode = ord($char);
-                if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
-                    || $asciiCode >= 97 && $asciiCode <= 122 // a-z
-                    || $asciiCode >= 48 && $asciiCode <= 57 // 0-9
-                    || $asciiCode == 95) { // _
-                    $keyWord .= $char;
-                    continue;
-                }
-                if (!$this->isSpace($char)) {
-                    $this->unreadChar();
-                }
-                break;
-            }
-
+        if ($this->parseVariableName($char, $keyWord)) {
             // The place where we can implement accessing object methods and properties
 
             // RETURN STATEMENT
