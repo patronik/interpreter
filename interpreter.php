@@ -477,14 +477,29 @@ class Interpreter
      */
     protected function evaluateBoolStatement()
     {
+        /**
+         * If expression contains only 1 math block - return as math expression result,
+         * otherwise cast type of result to boolean
+         */
         $result = $this->evaluateBoolExpression();
         while ($separator = $this->readChar()) {
             switch ($separator) {
                 case '|':
                     $nextChar = $this->readChar();
                     if ($nextChar == '|') {
-                        $nextResult = $this->evaluateBoolExpression();
-                        $result = $result || $nextResult;
+                        if ($result == true) {
+                            // in order to reduce amount of calculations,
+                            // skip the rest of the statement and return result
+                            while (!is_null($char = $this->readChar())) {
+                                if ($char == ';') {
+                                    $this->unreadChar();
+                                    break;
+                                }
+                                continue;
+                            }
+                            return (bool) $result;
+                        }
+                        $result = (bool) ($result || $this->evaluateBoolExpression());
                     } else {
                         throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
                     }
@@ -492,8 +507,7 @@ class Interpreter
                 case '&':
                     $nextChar = $this->readChar();
                     if ($nextChar == '&') {
-                        $nextResult = $this->evaluateBoolExpression();
-                        $result = $result && $nextResult;
+                        $result = (bool) ($result && $this->evaluateBoolExpression());
                     } else {
                         throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
                     }
