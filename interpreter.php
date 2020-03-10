@@ -7,6 +7,10 @@
 
 class Interpreter
 {
+    const STATEMENT_TYPE_ASSIGN    = 'assignment';
+    const STATEMENT_TYPE_BOOL_EXPR = 'bool_expr';
+    const STATEMENT_TYPE_RETURN    = 'return';
+
     /**
      * Variables
      *
@@ -23,6 +27,23 @@ class Interpreter
      * @var int
      */
     protected $pos;
+
+    /**
+     * @param int $pos
+     */
+    public function setPos(int $pos): void
+    {
+        $this->pos = $pos;
+    }
+
+    /**
+     * @param string $key
+     * @param mixed $val
+     */
+    public function setVar($key, $val): void
+    {
+        $this->var[$key] = $val;
+    }
 
     /**
      * Check if character is considered as space character
@@ -173,12 +194,14 @@ class Interpreter
             $varName = $char;
 
             // var name
-            while (!is_null($char = $this->readChar())) {
+            while (!is_null($char = $this->readChar(false, true))) {
                 if (preg_match('#[a-zA-Z0-9_]#', $char)) {
                     $varName .= $char;
                     continue;
                 }
-                $this->unreadChar();
+                if (!$this->isSpace($char)) {
+                    $this->unreadChar();
+                }
                 break;
             }
 
@@ -427,7 +450,7 @@ class Interpreter
     /**
      * Determine statement type and evaluate it
      *
-     * @return bool|int|null
+     * @return array
      * @throws Exception
      */
     protected function evaluateStatement()
@@ -435,19 +458,28 @@ class Interpreter
         $char = $this->readChar();
         // handle variable assignment statement
         if (preg_match('#[a-zA-Z]#', $char)) {
-            $varName = $char;
+            $keyWord = $char;
             // var name
-            while (!is_null($char = $this->readChar())) {
+            while (!is_null($char = $this->readChar(false, true))) {
                 if (preg_match('#[a-zA-Z0-9_]#', $char)) {
-                    $varName .= $char;
+                    $keyWord .= $char;
                     continue;
                 }
-                $this->unreadChar();
+                if (!$this->isSpace($char)) {
+                    $this->unreadChar();
+                }
                 break;
             }
 
             // The place where we can implement accessing object methods and properties
 
+            // RETURN STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_RETURN) {
+                return [self::STATEMENT_TYPE_RETURN, $this->evaluateBoolStatement()];
+            }
+            // END OF RETURN STATEMENT
+
+            // ASSIGNMENT STATEMENT
             if (!is_null($char = $this->readChar())) {
                 if ($char == '=') {
                     $nextChar = $this->readChar();
@@ -456,29 +488,30 @@ class Interpreter
                         // unread last 2 chars
                         $this->unreadChar(2);
                         // unread variable name
-                        $this->unreadChar(strlen($varName));
+                        $this->unreadChar(strlen($keyWord));
                     } else {
                         // unread last char
                         $this->unreadChar();
                         // variable assignment
-                        $this->var[$varName] = $this->evaluateBoolStatement();
-                        return null;
+                        $this->var[$keyWord] = $this->evaluateBoolStatement();
+                        return [self::STATEMENT_TYPE_ASSIGN, $this->var[$keyWord]];
                     }
                 } else {
                     // unread last char
                     $this->unreadChar();
                     // unread variable name
-                    $this->unreadChar(strlen($varName));
+                    $this->unreadChar(strlen($keyWord));
                 }
             } else {
                 // unread variable name
-                $this->unreadChar(strlen($varName));
+                $this->unreadChar(strlen($keyWord));
             }
+            // END OF ASSIGNMENT STATEMENT
         } else {
             $this->unreadChar();
         }
 
-        return $this->evaluateBoolStatement();
+        return [self::STATEMENT_TYPE_BOOL_EXPR, $this->evaluateBoolStatement()];
     }
 
     /**
@@ -495,13 +528,23 @@ class Interpreter
             $this->src = $code;
             $this->pos = 0;
         }
-        $programResult = $this->evaluateStatement();
+
+        $programResult = null;
+        $this->evaluateStatement();
         while ($separator = $this->readChar()) {
             switch ($separator) {
+            // TODO implement functions
+            /**
+                case '}':
+                    $this->unreadChar();
+                    return $programResult;
+                break;
+             **/
                 case ';':
-                    $statementResult = $this->evaluateStatement();
-                    if ($statementResult) {
-                        $programResult = $statementResult;
+                    list($statementType, $statementResult) = $this->evaluateStatement();
+                    // return value from program
+                    if ($statementType == self::STATEMENT_TYPE_RETURN) {
+                        return $statementResult;
                     }
                 break;
                 default:
