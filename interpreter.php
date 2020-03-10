@@ -7,9 +7,9 @@
 
 class Interpreter
 {
-    const STATEMENT_TYPE_ASSIGN    = 'assignment';
-    const STATEMENT_TYPE_BOOL_EXPR = 'bool_expr';
     const STATEMENT_TYPE_RETURN    = 'return';
+
+    protected $returnFlag = false;
 
     /**
      * Variables
@@ -442,7 +442,7 @@ class Interpreter
     /**
      * Determine statement type and evaluate it
      *
-     * @return array
+     * @return mixed
      * @throws Exception
      */
     protected function evaluateStatement()
@@ -467,7 +467,8 @@ class Interpreter
 
             // RETURN STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_RETURN) {
-                return [self::STATEMENT_TYPE_RETURN, $this->evaluateBoolStatement()];
+                $this->returnFlag = true;
+                return $this->evaluateBoolStatement();
             }
             // END OF RETURN STATEMENT
 
@@ -485,8 +486,7 @@ class Interpreter
                         // unread last char
                         $this->unreadChar();
                         // variable assignment
-                        $this->var[$keyWord] = $this->evaluateBoolStatement();
-                        return [self::STATEMENT_TYPE_ASSIGN, $this->var[$keyWord]];
+                        return $this->var[$keyWord] = $this->evaluateStatement();
                     }
                 } else {
                     // unread last char
@@ -503,7 +503,7 @@ class Interpreter
             $this->unreadChar();
         }
 
-        return [self::STATEMENT_TYPE_BOOL_EXPR, $this->evaluateBoolStatement()];
+        return $this->evaluateBoolStatement();
     }
 
     /**
@@ -531,9 +531,10 @@ class Interpreter
                 break;
                 **/
                 case ';':
-                    list($statementType, $statementResult) = $this->evaluateStatement();
+                    $statementResult = $this->evaluateStatement();
                     // return value from program
-                    if ($statementType == self::STATEMENT_TYPE_RETURN) {
+                    if ($this->returnFlag) {
+                        $this->returnFlag = false;
                         return $statementResult;
                     }
                 break;
