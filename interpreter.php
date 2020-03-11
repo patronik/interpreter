@@ -521,6 +521,18 @@ class Interpreter
                 case '&':
                     $nextChar = $this->readChar();
                     if ($nextChar == '&') {
+                        if ($result == false) {
+                            // in order to reduce amount of calculations,
+                            // skip the rest of the statement and return result
+                            while (!is_null($char = $this->readChar())) {
+                                if ($char == ';') {
+                                    $this->unreadChar();
+                                    break;
+                                }
+                                continue;
+                            }
+                            return (bool) $result;
+                        }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
                     } else {
                         throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
