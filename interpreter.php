@@ -74,7 +74,6 @@ class Interpreter
         if (!$allChars) {
             $this->skipSpaces();
         }
-
         if ($this->pos >= strlen($this->src)) {
             return null;
         }
@@ -635,41 +634,18 @@ class Interpreter
      * Evaluate program statements one by one.
      * Statement can be variable assignment, return statement, boolean|math expression etc.
      *
-     * @param $code
-     * @param $pos
      * @return mixed
      * @throws Exception
      */
-    public function evaluate($code = '', $pos = 0)
+    protected function evaluateStatements()
     {
-        $this->src = $code;
-        $this->pos = $pos;
-
-        $numOfOpenedBlocks = 0;
-        $numOfClosedBlocks = 0;
-
         $statementResult = $this->evaluateStatement();
         while (!$this->returnFlag && $separator = $this->readChar()) {
             switch ($separator) {
-                // start of block
                 case '{':
-                    $numOfOpenedBlocks++;
-                    $statementResult = $this->evaluateStatement();
-                    break;
-                // end of block
                 case '}':
-                    // enforce semicolon or another brace
-                    $this->unreadChar(2);
-                    $precedingChar = $this->readChar();
-                    if ($precedingChar != '}' // brace after brace
-                        && $precedingChar != '{' // opening and closing braces - empty block
-                        && $precedingChar != ';') // closing brace after statement - end of statement block
-                    {
-                        throw new Exception('Unexpected end of statement.');
-                    }
-                    $this->readChar();
-                    $numOfClosedBlocks++;
-                    $statementResult = $this->evaluateStatement();
+                    $this->unreadChar();
+                    return $statementResult;
                     break;
                 // end of statement
                 case ';':
@@ -685,20 +661,51 @@ class Interpreter
             if ($this->readChar() != ';') {
                 throw new Exception('Unexpected end of statement.');
             }
-            $this->returnFlag = false;
             return $statementResult;
+        }
+    }
+
+    /**
+     * Evaluate program statement blocks one by one.
+     *
+     * @param $code
+     * @param $pos
+     * @return mixed
+     * @throws Exception
+     */
+    public function evaluate($code = '', $pos = 0)
+    {
+        $this->src = $code;
+        $this->pos = $pos;
+
+        $numOfOpenedBlocks = 0;
+        $numOfClosedBlocks = 0;
+
+        $statementsResult = $this->evaluateStatements();
+        while (!$this->returnFlag && $separator = $this->readChar()) {
+            switch ($separator) {
+                // start of block
+                case '{':
+                    $numOfOpenedBlocks++;
+                    $statementsResult = $this->evaluateStatements();
+                    break;
+                // end of block
+                case '}':
+                    $numOfClosedBlocks++;
+                    $statementsResult = $this->evaluateStatements();
+                    break;
+                default:
+                    throw new Exception('Unexpected operator ' . $separator . '.');
+                break;
+            }
+        }
+
+        if ($this->returnFlag) {
+            return $statementsResult;
         }
 
         if ($numOfOpenedBlocks != $numOfClosedBlocks) {
             throw new Exception('Wrong number of braces.');
-        }
-
-        // we reached the end of code
-        // enforce semicolon at the end
-        $this->unreadChar();
-        $lastChar = $this->readChar();
-        if ($lastChar != '}' && $lastChar != ';') {
-            throw new Exception('Unexpected end of statement.');
         }
     }
 }
