@@ -113,16 +113,16 @@ class Interpreter
         switch ($operator) {
             case '-' :
                 return -$val;
-            break;
+                break;
             case '+' :
                 return +$val;
-            break;
+                break;
             case '++' :
                 return ++$val;
-            break;
+                break;
             case '--' :
                 return --$val;
-            break;
+                break;
         }
     }
 
@@ -297,6 +297,12 @@ class Interpreter
             return $atom;
         }
 
+        // handle braces
+        if ($char == '{' || $char == '}') {
+            $this->unreadChar();
+            return $atom;
+        }
+
         // handle subexpression
         if ($this->evaluateSubexpression($char, $atom)) {
             return $atom;
@@ -367,10 +373,10 @@ class Interpreter
                     break;
                 case '.':
                     $result .= $this->evaluateMathAtom();
-                break;
+                    break;
                 case '%':
                     $result %= $this->evaluateMathAtom();
-                break;
+                    break;
                 case '+':
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
@@ -380,7 +386,7 @@ class Interpreter
                         $this->unreadChar(2);
                         return $result;
                     }
-                break;
+                    break;
                 case '-':
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
@@ -390,7 +396,7 @@ class Interpreter
                         $this->unreadChar(2);
                         return $result;
                     }
-                break;
+                    break;
                 // Lower lever operators
                 case '=':
                 case '!':
@@ -402,12 +408,16 @@ class Interpreter
                 case ')':
                     // end of statement
                 case ';':
+                    // start of statement block
+                case '{':
+                    // end of statement block
+                case '}':
                     $this->unreadChar();
                     return $result;
-                break;
+                    break;
                 default:
                     throw new Exception('Unexpected operator ' . $separator . '.');
-                break;
+                    break;
             }
         }
         return $result;
@@ -467,17 +477,21 @@ class Interpreter
                 // Lower lever operators
                 case '&':
                 case '|':
-                // end of subexpression
+                    // end of subexpression
                 case ')':
-                // end of statement
+                    // end of statement
                 case ';':
+                    // start of statement block
+                case '{':
+                    // end of statement block
+                case '}':
                     $this->unreadChar();
                     // return result from recursive call
                     return $result;
-                break;
+                    break;
                 default:
                     throw new Exception('Unexpected operator ' . $separator . '.');
-                break;
+                    break;
             }
         }
         return $result;
@@ -517,7 +531,7 @@ class Interpreter
                     } else {
                         throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
                     }
-                break;
+                    break;
                 case '&':
                     $nextChar = $this->readChar();
                     if ($nextChar == '&') {
@@ -537,18 +551,22 @@ class Interpreter
                     } else {
                         throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
                     }
-                break;
+                    break;
                 // end of subexpression
                 case ')':
-                // end of statement
+                    // end of statement
                 case ';':
+                    // start of statement block
+                case '{':
+                    // end of statement block
+                case '}':
                     $this->unreadChar();
                     // return result from recursive call
                     return $result;
-                break;
+                    break;
                 default:
                     throw new Exception('Unexpected operator ' . $separator . '.');
-                break;
+                    break;
             }
         }
         return $result;
@@ -562,7 +580,11 @@ class Interpreter
      */
     protected function evaluateStatement()
     {
-        $char = $this->readChar();
+        if (is_null($char = $this->readChar())) {
+            // EOF is achieved
+            return null;
+        }
+
         $keyWord = null;
         // handle variable assignment statement
         if ($this->parseVariableName($char, $keyWord)) {
@@ -623,32 +645,60 @@ class Interpreter
         $this->src = $code;
         $this->pos = $pos;
 
+        $numOfOpenedBlocks = 0;
+        $numOfClosedBlocks = 0;
+
         $statementResult = $this->evaluateStatement();
-        // return value from program
-        if ($this->returnFlag) {
-            $this->returnFlag = false;
-            return $statementResult;
-        }
-        while ($separator = $this->readChar()) {
+        while (!$this->returnFlag && $separator = $this->readChar()) {
             switch ($separator) {
+                // start of block
+                case '{':
+                    $numOfOpenedBlocks++;
+                    $statementResult = $this->evaluateStatement();
+                    break;
+                // end of block
+                case '}':
+                    // enforce semicolon or another brace
+                    $this->unreadChar(2);
+                    $precedingChar = $this->readChar();
+                    if ($precedingChar != '}' // brace after brace
+                        && $precedingChar != '{' // opening and closing braces - empty block
+                        && $precedingChar != ';') // closing brace after statement - end of statement block
+                    {
+                        throw new Exception('Unexpected end of statement.');
+                    }
+                    $this->readChar();
+                    $numOfClosedBlocks++;
+                    $statementResult = $this->evaluateStatement();
+                    break;
+                // end of statement
                 case ';':
                     $statementResult = $this->evaluateStatement();
-                    // return value from program
-                    if ($this->returnFlag) {
-                        $this->returnFlag = false;
-                        return $statementResult;
-                    }
-                break;
+                    break;
                 default:
                     throw new Exception('Unexpected operator ' . $separator . '.');
-                break;
+                    break;
             }
         }
 
-        // enforce semicolon in the end of last statement
+        if ($this->returnFlag) {
+            if ($this->readChar() != ';') {
+                throw new Exception('Unexpected end of statement.');
+            }
+            $this->returnFlag = false;
+            return $statementResult;
+        }
+
+        if ($numOfOpenedBlocks != $numOfClosedBlocks) {
+            throw new Exception('Wrong number of braces.');
+        }
+
+        // we reached the end of code
+        // enforce semicolon at the end
         $this->unreadChar();
-        if ($this->readChar() != ';') {
-            throw new Exception('Unexpected end of file.');
+        $lastChar = $this->readChar();
+        if ($lastChar != '}' && $lastChar != ';') {
+            throw new Exception('Unexpected end of statement.');
         }
     }
 }
