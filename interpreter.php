@@ -166,6 +166,24 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
+    protected function evaluateSubexpression($char, &$atom)
+    {
+        if ($char == '(') {
+            $atom = $this->evaluateBoolStatement();
+            if ($this->readChar() != ')') {
+                throw new Exception('Syntax error. Wrong number of parentheses.');
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
     protected function evaluateVariableAtom($char, &$atom)
     {
         // variable
@@ -280,11 +298,7 @@ class Interpreter
         }
 
         // handle subexpression
-        if ($char == '(') {
-            $atom = $this->evaluateBoolStatement();
-            if ($this->readChar() != ')') {
-                throw new Exception('Syntax error. Wrong number of parentheses.');
-            }
+        if ($this->evaluateSubexpression($char, $atom)) {
             return $atom;
         }
 
@@ -294,7 +308,7 @@ class Interpreter
             $char = $this->readChar();
         }
 
-        // unary plus and pre decrement
+        // unary plus and pre increment
         if ($char == '+') {
             $preOperator = $char;
             $char = $this->readChar();
@@ -605,13 +619,6 @@ class Interpreter
         }
         while ($separator = $this->readChar()) {
             switch ($separator) {
-                // TODO implement functions
-                /**
-                case '}':
-                    $this->unreadChar();
-                    return;
-                break;
-                **/
                 case ';':
                     $statementResult = $this->evaluateStatement();
                     // return value from program
