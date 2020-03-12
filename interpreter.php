@@ -294,7 +294,7 @@ class Interpreter
 
         $char = $this->readChar();
 
-        if (empty($char)) {
+        if (is_null($char)) {
             return $atom;
         }
 
