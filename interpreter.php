@@ -298,12 +298,6 @@ class Interpreter
             return $atom;
         }
 
-        // handle braces
-        if ($char == '{' || $char == '}') {
-            $this->unreadChar();
-            return $atom;
-        }
-
         // handle subexpression
         if ($this->evaluateSubexpression($char, $atom)) {
             return $atom;
@@ -410,9 +404,6 @@ class Interpreter
                     // end of statement
                 case ';':
                     // start of statement block
-                case '{':
-                    // end of statement block
-                case '}':
                     $this->unreadChar();
                     return $result;
                     break;
@@ -483,9 +474,6 @@ class Interpreter
                     // end of statement
                 case ';':
                     // start of statement block
-                case '{':
-                    // end of statement block
-                case '}':
                     $this->unreadChar();
                     // return result from recursive call
                     return $result;
@@ -557,10 +545,6 @@ class Interpreter
                 case ')':
                     // end of statement
                 case ';':
-                    // start of statement block
-                case '{':
-                    // end of statement block
-                case '}':
                     $this->unreadChar();
                     // return result from recursive call
                     return $result;
@@ -583,6 +567,12 @@ class Interpreter
     {
         if (is_null($char = $this->readChar())) {
             // EOF is achieved
+            return null;
+        }
+
+        // handle braces
+        if ($char == '{' || $char == '}') {
+            $this->unreadChar();
             return null;
         }
 
