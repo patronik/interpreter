@@ -262,7 +262,7 @@ class Interpreter
         $asciiCode = ord($char);
         if ($asciiCode >= 48 && $asciiCode <= 57) { // 0-9
             $atom = $char;
-            while (!is_null($char = $this->readChar())) {
+            while (!is_null($char = $this->readChar(false, true))) {
                 $asciiCode = ord($char);
                 if ($asciiCode >= 48 && $asciiCode <= 57 // 0-9
                     || $asciiCode == 46) // .
@@ -270,7 +270,9 @@ class Interpreter
                     $atom .= $char;
                     continue;
                 }
-                $this->unreadChar();
+                if (!$this->isSpace($char)) {
+                    $this->unreadChar();
+                }
                 break;
             }
             return true;
@@ -415,7 +417,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected operator ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $separator . '.');
                     break;
             }
         }
@@ -444,7 +446,7 @@ class Interpreter
                     if ($nextChar == '=') {
                         $result = $result == $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
                     }
                     break;
                 case '!':
@@ -452,7 +454,7 @@ class Interpreter
                     if ($nextChar == '=') {
                         $result = $result != $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
                     }
                     break;
                 case '>':
@@ -489,7 +491,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected operator ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $separator . '.');
                     break;
             }
         }
@@ -528,7 +530,7 @@ class Interpreter
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
                     } else {
-                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
                     }
                     break;
                 case '&':
@@ -548,7 +550,7 @@ class Interpreter
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
                     } else {
-                        throw new Exception('Unexpected operator ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
                     }
                     break;
                 // end of subexpression
@@ -564,7 +566,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected operator ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $separator . '.');
                     break;
             }
         }
@@ -652,7 +654,7 @@ class Interpreter
                     $statementResult = $this->evaluateStatement();
                     break;
                 default:
-                    throw new Exception('Unexpected operator ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $separator . '.');
                     break;
             }
         }
@@ -695,7 +697,7 @@ class Interpreter
                     $statementsResult = $this->evaluateStatements();
                     break;
                 default:
-                    throw new Exception('Unexpected operator ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $separator . '.');
                 break;
             }
         }
