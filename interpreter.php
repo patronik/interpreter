@@ -9,7 +9,14 @@ class Interpreter
 {
     const STATEMENT_TYPE_RETURN    = 'return';
 
-    protected $returnFlag = false;
+    protected $return = false;
+
+    /**
+     * Result of last executed statement
+     *
+     * @var
+     */
+    protected $lastResult;
 
     /**
      * Variables
@@ -506,9 +513,9 @@ class Interpreter
                     if ($nextChar == '|') {
                         if ($result == true) {
                             // in order to reduce amount of calculations,
-                            // skip the rest of the statement and return result
+                            // skip the rest of expression and return result
                             while (!is_null($char = $this->readChar())) {
-                                if ($char == ';') {
+                                if ($char == ';' || $char == ')') {
                                     $this->unreadChar();
                                     break;
                                 }
@@ -526,9 +533,9 @@ class Interpreter
                     if ($nextChar == '&') {
                         if ($result == false) {
                             // in order to reduce amount of calculations,
-                            // skip the rest of the statement and return result
+                            // skip the rest of expression and return result
                             while (!is_null($char = $this->readChar())) {
-                                if ($char == ';') {
+                                if ($char == ';' || $char == ')') {
                                     $this->unreadChar();
                                     break;
                                 }
@@ -583,8 +590,8 @@ class Interpreter
 
             // RETURN STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_RETURN) {
-                $this->returnFlag = true;
-                return $this->evaluateBoolStatement();
+                $this->return = true;
+                return $this->evaluateStatement();
             }
             // END OF RETURN STATEMENT
 
@@ -632,28 +639,27 @@ class Interpreter
     protected function evaluateStatements()
     {
         $statementResult = $this->evaluateStatement();
-        while (!$this->returnFlag && $separator = $this->readChar()) {
+        if (!is_null($statementResult)) {
+            $this->lastResult = $statementResult;
+        }
+        while (!$this->return && $separator = $this->readChar()) {
             switch ($separator) {
                 case '{':
                 case '}':
                     $this->unreadChar();
-                    return $statementResult;
+                    return;
                     break;
                 // end of statement
                 case ';':
                     $statementResult = $this->evaluateStatement();
+                    if (!is_null($statementResult)) {
+                        $this->lastResult = $statementResult;
+                    }
                     break;
                 default:
                     throw new Exception('Unexpected token ' . $separator . '.');
                     break;
             }
-        }
-
-        if ($this->returnFlag) {
-            if ($this->readChar() != ';') {
-                throw new Exception('Unexpected end of statement.');
-            }
-            return $statementResult;
         }
     }
 
@@ -673,18 +679,18 @@ class Interpreter
         $numOfOpenedBlocks = 0;
         $numOfClosedBlocks = 0;
 
-        $statementsResult = $this->evaluateStatements();
-        while (!$this->returnFlag && $separator = $this->readChar()) {
+        $this->evaluateStatements();
+        while (!$this->return && $separator = $this->readChar()) {
             switch ($separator) {
                 // start of block
                 case '{':
                     $numOfOpenedBlocks++;
-                    $statementsResult = $this->evaluateStatements();
+                    $this->evaluateStatements();
                     break;
                 // end of block
                 case '}':
                     $numOfClosedBlocks++;
-                    $statementsResult = $this->evaluateStatements();
+                    $this->evaluateStatements();
                     break;
                 default:
                     throw new Exception('Unexpected token ' . $separator . '.');
@@ -692,12 +698,12 @@ class Interpreter
             }
         }
 
-        if ($this->returnFlag) {
-            return $statementsResult;
+        if (!$this->return) {
+            if ($numOfOpenedBlocks != $numOfClosedBlocks) {
+                throw new Exception('Wrong number of braces.');
+            }
         }
 
-        if ($numOfOpenedBlocks != $numOfClosedBlocks) {
-            throw new Exception('Wrong number of braces.');
-        }
+        return $this->lastResult;
     }
 }
