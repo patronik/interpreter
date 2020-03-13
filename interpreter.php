@@ -574,13 +574,13 @@ class Interpreter
     {
         if (is_null($char = $this->readChar())) {
             // EOF is achieved
-            return null;
+            return $this->lastResult;
         }
 
         // handle braces
         if ($char == '{' || $char == '}') {
             $this->unreadChar();
-            return null;
+            return $this->lastResult;
         }
 
         $keyWord = null;
@@ -639,9 +639,7 @@ class Interpreter
     protected function evaluateStatements()
     {
         $statementResult = $this->evaluateStatement();
-        if (!is_null($statementResult)) {
-            $this->lastResult = $statementResult;
-        }
+        $this->lastResult = $statementResult;
         while (!$this->return && $separator = $this->readChar()) {
             switch ($separator) {
                 case '{':
@@ -652,9 +650,7 @@ class Interpreter
                 // end of statement
                 case ';':
                     $statementResult = $this->evaluateStatement();
-                    if (!is_null($statementResult)) {
-                        $this->lastResult = $statementResult;
-                    }
+                    $this->lastResult = $statementResult;
                     break;
                 default:
                     throw new Exception('Unexpected token ' . $separator . '.');
