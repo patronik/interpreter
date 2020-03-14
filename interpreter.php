@@ -576,8 +576,9 @@ class Interpreter
      * Rewind src until specified char is found
      *
      * @param $terminators
+     * @param $recursionMarker
      */
-    protected function rewindUntil($terminators = [])
+    protected function rewindUntil($terminators = [], $recursionMarker = null)
     {
         $inSingleQuotedStr = false;
         $inDoubleQuotedStr = false;
@@ -601,6 +602,11 @@ class Interpreter
                 } else if ($prevChar != "\\") {
                     $inDoubleQuotedStr = false;
                 }
+            }
+
+            if ($recursionMarker && $char == $recursionMarker) {
+                $this->rewindUntil($terminators, $recursionMarker);
+                $this->readChar();
             }
 
             if (in_array($char, $terminators)
@@ -631,7 +637,7 @@ class Interpreter
 
         $this->numOfOpenedBlocks++;
 
-        $this->rewindUntil(['}']);
+        $this->rewindUntil(['}'], '{');
     }
 
     /**
