@@ -299,49 +299,49 @@ class Interpreter
         $boolInversion = false;
         $preOperator = false;
 
-        $char = $this->readChar();
+        $atomChar = $this->readChar();
 
-        if (is_null($char)) {
+        if (is_null($atomChar)) {
             return $atom;
         }
 
         // handle subexpression
-        if ($this->evaluateSubexpression($char, $atom)) {
+        if ($this->evaluateSubexpression($atomChar, $atom)) {
             return $atom;
         }
 
         // check for boolean inversion
-        if ($char == '!') {
+        if ($atomChar == '!') {
             $boolInversion = true;
-            $char = $this->readChar();
+            $atomChar = $this->readChar();
         }
 
         // unary plus and pre increment
-        if ($char == '+') {
-            $preOperator = $char;
-            $char = $this->readChar();
+        if ($atomChar == '+') {
+            $preOperator = $atomChar;
+            $atomChar = $this->readChar();
             // check for pre increment
-            if ($char == '+') {
-                $preOperator .= $char;
-                $char = $this->readChar();
+            if ($atomChar == '+') {
+                $preOperator .= $atomChar;
+                $atomChar = $this->readChar();
             }
         }
 
         // unary minus and pre decrement
-        if ($char == '-') {
-            $preOperator = $char;
-            $char = $this->readChar();
+        if ($atomChar == '-') {
+            $preOperator = $atomChar;
+            $atomChar = $this->readChar();
             // check for pre decrement
-            if ($char == '-') {
-                $preOperator .= $char;
-                $char = $this->readChar();
+            if ($atomChar == '-') {
+                $preOperator .= $atomChar;
+                $atomChar = $this->readChar();
             }
         }
 
-        if (!$this->evaluateVariableAtom($char, $atom)) {
-            if (!$this->evaluateNumberAtom($char, $atom)) {
-                if (!$this->evaluateSingleQuotedStringAtom($char, $atom)) {
-                    $this->evaluateDoubleQuotedStringAtom($char, $atom);
+        if (!$this->evaluateVariableAtom($atomChar, $atom)) {
+            if (!$this->evaluateNumberAtom($atomChar, $atom)) {
+                if (!$this->evaluateSingleQuotedStringAtom($atomChar, $atom)) {
+                    $this->evaluateDoubleQuotedStringAtom($atomChar, $atom);
                 }
             }
         }
@@ -365,8 +365,8 @@ class Interpreter
     protected function evaluateMathBlock()
     {
         $result = $this->evaluateMathAtom();
-        while ($separator = $this->readChar()) {
-            switch ($separator) {
+        while ($atomOp = $this->readChar()) {
+            switch ($atomOp) {
                 case '*':
                     $result *= $this->evaluateMathAtom();
                     break;
@@ -415,7 +415,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected token ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $atomOp . '.');
                     break;
             }
         }
@@ -431,8 +431,8 @@ class Interpreter
     protected function evaluateBoolExpression()
     {
         $result = $this->evaluateMathBlock();
-        while ($separator = $this->readChar()) {
-            switch ($separator) {
+        while ($mathOp = $this->readChar()) {
+            switch ($mathOp) {
                 case '+':
                     $result += $this->evaluateMathBlock();
                     break;
@@ -444,7 +444,7 @@ class Interpreter
                     if ($nextChar == '=') {
                         $result = $result == $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
                     }
                     break;
                 case '!':
@@ -452,7 +452,7 @@ class Interpreter
                     if ($nextChar == '=') {
                         $result = $result != $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
                     }
                     break;
                 case '>':
@@ -486,7 +486,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected token ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $mathOp . '.');
                     break;
             }
         }
@@ -506,8 +506,8 @@ class Interpreter
          * otherwise cast type of result to boolean
          */
         $result = $this->evaluateBoolExpression();
-        while ($separator = $this->readChar()) {
-            switch ($separator) {
+        while ($booleanOp = $this->readChar()) {
+            switch ($booleanOp) {
                 case '|':
                     $nextChar = $this->readChar();
                     if ($nextChar == '|') {
@@ -525,7 +525,7 @@ class Interpreter
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
                     } else {
-                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $booleanOp . $nextChar . '.');
                     }
                     break;
                 case '&':
@@ -545,7 +545,7 @@ class Interpreter
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
                     } else {
-                        throw new Exception('Unexpected token ' . $separator . $nextChar . '.');
+                        throw new Exception('Unexpected token ' . $booleanOp . $nextChar . '.');
                     }
                     break;
                 // end of subexpression
@@ -557,7 +557,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected token ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $booleanOp . '.');
                     break;
             }
         }
@@ -567,20 +567,20 @@ class Interpreter
     /**
      * Determine statement type and evaluate it
      *
-     * @return mixed
+     * @return void
      * @throws Exception
      */
     protected function evaluateStatement()
     {
         if (is_null($char = $this->readChar())) {
             // EOF is achieved
-            return $this->lastResult;
+            return;
         }
 
         // handle braces
         if ($char == '{' || $char == '}') {
             $this->unreadChar();
-            return $this->lastResult;
+            return;
         }
 
         $keyWord = null;
@@ -591,7 +591,8 @@ class Interpreter
             // RETURN STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_RETURN) {
                 $this->return = true;
-                return $this->evaluateStatement();
+                $this->evaluateStatement();
+                return;
             }
             // END OF RETURN STATEMENT
 
@@ -609,7 +610,9 @@ class Interpreter
                         // unread last char
                         $this->unreadChar();
                         // variable assignment
-                        return $this->var[$keyWord] = $this->evaluateStatement();
+                        $this->evaluateStatement();
+                        $this->var[$keyWord] = $this->lastResult;
+                        return;
                     }
                 } else {
                     // unread last char
@@ -626,7 +629,7 @@ class Interpreter
             $this->unreadChar();
         }
 
-        return $this->evaluateBoolStatement();
+        $this->lastResult = $this->evaluateBoolStatement();
     }
 
     /**
@@ -638,10 +641,9 @@ class Interpreter
      */
     protected function evaluateStatements()
     {
-        $statementResult = $this->evaluateStatement();
-        $this->lastResult = $statementResult;
-        while (!$this->return && $separator = $this->readChar()) {
-            switch ($separator) {
+        $this->evaluateStatement();
+        while (!$this->return && $statementOp = $this->readChar()) {
+            switch ($statementOp) {
                 case '{':
                 case '}':
                     $this->unreadChar();
@@ -649,11 +651,10 @@ class Interpreter
                     break;
                 // end of statement
                 case ';':
-                    $statementResult = $this->evaluateStatement();
-                    $this->lastResult = $statementResult;
+                    $this->evaluateStatement();
                     break;
                 default:
-                    throw new Exception('Unexpected token ' . $separator . '.');
+                    throw new Exception('Unexpected token ' . $statementOp . '.');
                     break;
             }
         }
