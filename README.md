@@ -16,12 +16,14 @@ require_once 'interpreter.php';
 $inter = new Interpreter();
 try {
     $res = $inter->evaluate(<<<CODE
-b = 190;
-if (10 > 100) {
-    2 + 2;
-} else {
-    return 7 + 3;
+if (2 > 1) {
+    if (32 > 11) {
+        result = 2;
+    } else {
+        result = 7;
+    }
 }
+return result;
 CODE
 );
     echo $res . "\n";
@@ -32,7 +34,7 @@ CODE
 
 Output:
 ```
-10
+2
 ```
 
 ## Conclusions
