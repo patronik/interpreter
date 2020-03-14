@@ -7,9 +7,14 @@
 
 class Interpreter
 {
-    const STATEMENT_TYPE_RETURN    = 'return';
+    const STATEMENT_TYPE_RETURN = 'return';
+    const STATEMENT_TYPE_IF     = 'if';
+    const STATEMENT_TYPE_ELSE   = 'else';
 
     protected $return = false;
+
+    protected $numOfOpenedBlocks = 0;
+    protected $numOfClosedBlocks = 0;
 
     /**
      * Result of last executed statement
@@ -17,6 +22,13 @@ class Interpreter
      * @var
      */
     protected $lastResult;
+
+    /**
+     * The result of last if statement expression
+     *
+     * @var
+     */
+    protected $lastIfResult;
 
     /**
      * Variables
@@ -519,7 +531,6 @@ class Interpreter
                                     $this->unreadChar();
                                     break;
                                 }
-                                continue;
                             }
                             return (bool) $result;
                         }
@@ -539,7 +550,6 @@ class Interpreter
                                     $this->unreadChar();
                                     break;
                                 }
-                                continue;
                             }
                             return (bool) $result;
                         }
@@ -562,6 +572,80 @@ class Interpreter
             }
         }
         return $result;
+    }
+
+    protected function execBlockOrSingleStatement()
+    {
+        if (is_null($char = $this->readChar())) {
+            // EOF is achieved
+            return;
+        }
+
+        if ($char != '{') {
+            $this->unreadChar();
+            // evaluate 1 statement
+            $this->evaluateStatement();
+            return;
+        } else {
+            $this->numOfOpenedBlocks++;
+            $this->evaluateStatements();
+        }
+    }
+
+    protected function skipBlockOrSingleStatement()
+    {
+        if (is_null($char = $this->readChar())) {
+            // EOF is achieved
+            return;
+        }
+
+        if ($char != '{') {
+            // skip 1 statement
+            while (!is_null($char = $this->readChar())) {
+                if ($char == ';') {
+                    $this->unreadChar();
+                    break;
+                }
+            }
+            return;
+        }
+
+        $this->numOfOpenedBlocks++;
+
+        $inSingleQuotedStr = false;
+        $inDoubleQuotedStr = false;
+
+        $prevChar = null;
+        while (!is_null($char = $this->readChar())) {
+            if ($char == "'") {
+                if (!$inSingleQuotedStr) {
+                    if (!$inDoubleQuotedStr) {
+                        $inSingleQuotedStr = true;
+                    }
+                } else if ($prevChar != "\\") {
+                    $inSingleQuotedStr = false;
+                }
+            }
+            if ($char == "\"") {
+                if (!$inDoubleQuotedStr) {
+                    if (!$inSingleQuotedStr) {
+                        $inDoubleQuotedStr = true;
+                    }
+                } else if ($prevChar != "\\") {
+                    $inDoubleQuotedStr = false;
+                }
+            }
+
+            if ($char == '}'
+                && !$inSingleQuotedStr
+                && !$inDoubleQuotedStr
+                )
+            {
+                $this->unreadChar();
+                break;
+            }
+            $prevChar = $char;
+        }
     }
 
     /**
@@ -595,6 +679,29 @@ class Interpreter
                 return;
             }
             // END OF RETURN STATEMENT
+
+            // IF STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_IF) {
+                $this->evaluateSubexpression($char = $this->readChar(), $this->lastIfResult);
+                if ($this->lastIfResult) {
+                    $this->execBlockOrSingleStatement();
+                } else {
+                    $this->skipBlockOrSingleStatement();
+                }
+                return;
+            }
+            // END OF IF STATEMENT
+
+            // ELSE STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_ELSE) {
+                if (!$this->lastIfResult) {
+                    $this->execBlockOrSingleStatement();
+                } else {
+                    $this->skipBlockOrSingleStatement();
+                }
+                return;
+            }
+            // END OF ELSE STATEMENT
 
             // ASSIGNMENT STATEMENT
             if (!is_null($char = $this->readChar())) {
@@ -673,20 +780,20 @@ class Interpreter
         $this->src = $code;
         $this->pos = $pos;
 
-        $numOfOpenedBlocks = 0;
-        $numOfClosedBlocks = 0;
+        $this->numOfOpenedBlocks = 0;
+        $this->numOfClosedBlocks = 0;
 
         $this->evaluateStatements();
         while (!$this->return && $separator = $this->readChar()) {
             switch ($separator) {
                 // start of block
                 case '{':
-                    $numOfOpenedBlocks++;
+                    $this->numOfOpenedBlocks++;
                     $this->evaluateStatements();
                     break;
                 // end of block
                 case '}':
-                    $numOfClosedBlocks++;
+                    $this->numOfClosedBlocks++;
                     $this->evaluateStatements();
                     break;
                 default:
@@ -696,7 +803,7 @@ class Interpreter
         }
 
         if (!$this->return) {
-            if ($numOfOpenedBlocks != $numOfClosedBlocks) {
+            if ($this->numOfOpenedBlocks != $this->numOfClosedBlocks) {
                 throw new Exception('Wrong number of braces.');
             }
         }
