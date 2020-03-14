@@ -48,6 +48,11 @@ class Interpreter
     protected $pos;
 
     /**
+     * Dynamic characters buffer
+     */
+    protected $dynamicQueue = [];
+
+    /**
      * @param string $key
      * @param mixed $val
      */
@@ -90,6 +95,9 @@ class Interpreter
      */
     protected function readChar($toLower = false, $allChars = false)
     {
+        if (count($this->dynamicQueue)) {
+            return array_shift($this->dynamicQueue);
+        }
         if (!$allChars) {
             $this->skipSpaces();
         }
@@ -526,12 +534,7 @@ class Interpreter
                         if ($result == true) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
-                            while (!is_null($char = $this->readChar())) {
-                                if ($char == ';' || $char == ')') {
-                                    $this->unreadChar();
-                                    break;
-                                }
-                            }
+                            $this->rewindUntil([';', ')']);
                             return (bool) $result;
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
@@ -545,12 +548,7 @@ class Interpreter
                         if ($result == false) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
-                            while (!is_null($char = $this->readChar())) {
-                                if ($char == ';' || $char == ')') {
-                                    $this->unreadChar();
-                                    break;
-                                }
-                            }
+                            $this->rewindUntil([';', ')']);
                             return (bool) $result;
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
@@ -574,44 +572,13 @@ class Interpreter
         return $result;
     }
 
-    protected function execBlockOrSingleStatement()
+    /**
+     * Rewind src until specified char is found
+     *
+     * @param $terminators
+     */
+    protected function rewindUntil($terminators = [])
     {
-        if (is_null($char = $this->readChar())) {
-            // EOF is achieved
-            return;
-        }
-
-        if ($char != '{') {
-            $this->unreadChar();
-            // evaluate 1 statement
-            $this->evaluateStatement();
-            return;
-        } else {
-            $this->numOfOpenedBlocks++;
-            $this->evaluateStatements();
-        }
-    }
-
-    protected function skipBlockOrSingleStatement()
-    {
-        if (is_null($char = $this->readChar())) {
-            // EOF is achieved
-            return;
-        }
-
-        if ($char != '{') {
-            // skip 1 statement
-            while (!is_null($char = $this->readChar())) {
-                if ($char == ';') {
-                    $this->unreadChar();
-                    break;
-                }
-            }
-            return;
-        }
-
-        $this->numOfOpenedBlocks++;
-
         $inSingleQuotedStr = false;
         $inDoubleQuotedStr = false;
 
@@ -636,16 +603,35 @@ class Interpreter
                 }
             }
 
-            if ($char == '}'
+            if (in_array($char, $terminators)
                 && !$inSingleQuotedStr
                 && !$inDoubleQuotedStr
-                )
+            )
             {
+                // unread terminator to allow parser to process it
                 $this->unreadChar();
                 break;
             }
             $prevChar = $char;
         }
+    }
+
+    protected function skipBlockOrSingleStatement()
+    {
+        if (is_null($char = $this->readChar())) {
+            // EOF is achieved
+            return;
+        }
+
+        if ($char != '{') {
+            // skip 1 statement
+            $this->rewindUntil([';']);
+            return;
+        }
+
+        $this->numOfOpenedBlocks++;
+
+        $this->rewindUntil(['}']);
     }
 
     /**
@@ -682,11 +668,15 @@ class Interpreter
 
             // IF STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_IF) {
-                $this->evaluateSubexpression($char = $this->readChar(), $this->lastIfResult);
-                if ($this->lastIfResult) {
-                    $this->execBlockOrSingleStatement();
-                } else {
+                $char = $this->readChar();
+                if ($char != '(') {
+                    throw new Exception('Unexpected token ' . $char . '.');
+                }
+                $this->evaluateSubexpression($char, $this->lastIfResult);
+                if (!$this->lastIfResult) {
                     $this->skipBlockOrSingleStatement();
+                } else {
+                    $this->dynamicQueue[] = ';';
                 }
                 return;
             }
@@ -694,10 +684,10 @@ class Interpreter
 
             // ELSE STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_ELSE) {
-                if (!$this->lastIfResult) {
-                    $this->execBlockOrSingleStatement();
-                } else {
+                if ($this->lastIfResult) {
                     $this->skipBlockOrSingleStatement();
+                } else {
+                    $this->dynamicQueue[] = ';';
                 }
                 return;
             }
@@ -802,12 +792,12 @@ class Interpreter
             }
         }
 
-        if (!$this->return) {
+        if ($this->return) {
+            return $this->lastResult;
+        } else {
             if ($this->numOfOpenedBlocks != $this->numOfClosedBlocks) {
                 throw new Exception('Wrong number of braces.');
             }
         }
-
-        return $this->lastResult;
     }
 }
