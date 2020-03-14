@@ -16,9 +16,12 @@ require_once 'interpreter.php';
 $inter = new Interpreter();
 try {
     $res = $inter->evaluate(<<<CODE
-age = 18;
-height = 190 * 2;
-return age + height * (2 + 3) - 70;
+b = 190;
+if (10 > 100) {
+    2 + 2;
+} else {
+    return 7 + 3;
+}
 CODE
 );
     echo $res . "\n";
@@ -29,7 +32,7 @@ CODE
 
 Output:
 ```
-1848
+10
 ```
 
 ## Conclusions
