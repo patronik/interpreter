@@ -534,7 +534,7 @@ class Interpreter
                         if ($result == true) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
-                            $this->rewindUntil([';', ')']);
+                            $this->rewindUntil([';', ')'], '(');
                             return (bool) $result;
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
@@ -548,7 +548,7 @@ class Interpreter
                         if ($result == false) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
-                            $this->rewindUntil([';', ')']);
+                            $this->rewindUntil([';', ')'], '(');
                             return (bool) $result;
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
@@ -594,6 +594,7 @@ class Interpreter
                     $inSingleQuotedStr = false;
                 }
             }
+
             if ($char == "\"") {
                 if (!$inDoubleQuotedStr) {
                     if (!$inSingleQuotedStr) {
@@ -604,20 +605,17 @@ class Interpreter
                 }
             }
 
-            if ($recursionMarker && $char == $recursionMarker) {
-                $this->rewindUntil($terminators, $recursionMarker);
-                $this->readChar();
+            if (!$inSingleQuotedStr && !$inDoubleQuotedStr) {
+                if ($recursionMarker && $char == $recursionMarker) {
+                    $this->rewindUntil($terminators, $recursionMarker);
+                    $this->readChar();
+                } else if (in_array($char, $terminators)) {
+                    // unread terminator to allow parser to process it
+                    $this->unreadChar();
+                    break;
+                }
             }
 
-            if (in_array($char, $terminators)
-                && !$inSingleQuotedStr
-                && !$inDoubleQuotedStr
-            )
-            {
-                // unread terminator to allow parser to process it
-                $this->unreadChar();
-                break;
-            }
             $prevChar = $char;
         }
     }
@@ -800,10 +798,10 @@ class Interpreter
 
         if ($this->return) {
             return $this->lastResult;
-        } else {
-            if ($this->numOfOpenedBlocks != $this->numOfClosedBlocks) {
-                throw new Exception('Wrong number of braces.');
-            }
+        }
+
+        if ($this->numOfOpenedBlocks != $this->numOfClosedBlocks) {
+            throw new Exception('Wrong number of braces.');
         }
     }
 }
