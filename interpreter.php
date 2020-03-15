@@ -28,7 +28,12 @@ class Interpreter
      *
      * @var
      */
-    protected $lastIfResult;
+    protected $lastIfResult = [];
+
+    /**
+     * @var int
+     */
+    protected $codeDepth = 0;
 
     /**
      * Variables
@@ -535,6 +540,7 @@ class Interpreter
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
+                            $this->unreadChar();
                             return (bool) $result;
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
@@ -549,6 +555,7 @@ class Interpreter
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
+                            $this->unreadChar();
                             return (bool) $result;
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
@@ -576,12 +583,13 @@ class Interpreter
      * Rewind src until specified char is found
      *
      * @param $terminators
-     * @param $recursionMarker
+     * @param $nestedMarker
      */
-    protected function rewindUntil($terminators = [], $recursionMarker = null)
+    protected function rewindUntil($terminators = [], $nestedMarker = null)
     {
         $inSingleQuotedStr = false;
         $inDoubleQuotedStr = false;
+        $depth = 0;
 
         $prevChar = null;
         while (!is_null($char = $this->readChar())) {
@@ -606,13 +614,15 @@ class Interpreter
             }
 
             if (!$inSingleQuotedStr && !$inDoubleQuotedStr) {
-                if ($recursionMarker && $char == $recursionMarker) {
-                    $this->rewindUntil($terminators, $recursionMarker);
+                if ($nestedMarker && $char == $nestedMarker) {
+                    $depth++;
                     $this->readChar();
                 } else if (in_array($char, $terminators)) {
-                    // unread terminator to allow parser to process it
-                    $this->unreadChar();
-                    break;
+                    if ($depth == 0) {
+                        break;
+                    } else {
+                        $depth--;
+                    }
                 }
             }
 
@@ -626,16 +636,17 @@ class Interpreter
             // EOF is achieved
             return;
         }
-
         if ($char != '{') {
             // skip 1 statement
             $this->rewindUntil([';']);
-            return;
+
+        } else {
+            // skip 1 code block
+            $this->rewindUntil(['}'], '{');
         }
 
-        $this->numOfOpenedBlocks++;
-
-        $this->rewindUntil(['}'], '{');
+        // tell parser to start evaluating next statement
+        $this->dynamicQueue[] = ';';
     }
 
     /**
@@ -676,8 +687,10 @@ class Interpreter
                 if ($char != '(') {
                     throw new Exception('Unexpected token ' . $char . '.');
                 }
-                $this->evaluateSubexpression($char, $this->lastIfResult);
-                if (!$this->lastIfResult) {
+                $this->evaluateSubexpression(
+                    $char, $this->lastIfResult[$this->codeDepth]
+                );
+                if (!$this->lastIfResult[$this->codeDepth]) {
                     $this->skipBlockOrSingleStatement();
                 } else {
                     $this->dynamicQueue[] = ';';
@@ -688,7 +701,17 @@ class Interpreter
 
             // ELSE STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_ELSE) {
-                if ($this->lastIfResult) {
+                if ($this->lastIfResult[$this->codeDepth]) {
+                    // skip else if
+                    if ($char = $this->readChar() == 'i') {
+                        if ($nextChar = $this->readChar() == 'f') {
+                            $this->rewindUntil([')']);
+                        } else {
+                            throw new Exception('Unexpected token ' . $nextChar . '.');
+                        }
+                    } else {
+                        $this->unreadChar();
+                    }
                     $this->skipBlockOrSingleStatement();
                 } else {
                     $this->dynamicQueue[] = ';';
@@ -783,11 +806,13 @@ class Interpreter
                 // start of block
                 case '{':
                     $this->numOfOpenedBlocks++;
+                    $this->codeDepth++;
                     $this->evaluateStatements();
                     break;
                 // end of block
                 case '}':
                     $this->numOfClosedBlocks++;
+                    $this->codeDepth--;
                     $this->evaluateStatements();
                     break;
                 default:
