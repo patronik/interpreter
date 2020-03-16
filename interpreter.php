@@ -332,11 +332,6 @@ class Interpreter
             return $atom;
         }
 
-        // handle subexpression
-        if ($this->evaluateSubexpression($atomChar, $atom)) {
-            return $atom;
-        }
-
         // check for boolean inversion
         if ($atomChar == '!') {
             $boolInversion = true;
@@ -363,6 +358,11 @@ class Interpreter
                 $preOperator .= $atomChar;
                 $atomChar = $this->readChar();
             }
+        }
+
+        // handle subexpression
+        if ($this->evaluateSubexpression($atomChar, $atom)) {
+            return $atom;
         }
 
         if (!$this->evaluateVariableAtom($atomChar, $atom)) {
@@ -392,7 +392,7 @@ class Interpreter
     protected function evaluateMathBlock()
     {
         $result = $this->evaluateMathAtom();
-        while ($atomOp = $this->readChar()) {
+        while ($atomOp = $this->readChar(true)) {
             switch ($atomOp) {
                 case '*':
                     $result *= $this->evaluateMathAtom();
@@ -427,12 +427,14 @@ class Interpreter
                     }
                     break;
                 // Lower lever operators
-                case '=':
-                case '!':
-                case '>':
-                case '<':
-                case '&':
-                case '|':
+                case '=': // equality ===
+                case '!': // boolean not
+                case '>': // less than
+                case '<': // greater than
+                case '&': // boolean "and" &&
+                case '|': // boolean "or" ||
+                case 'l': // check against regex
+                case 'i': // find in set
                     // end of subexpression
                 case ')':
                     // end of statement
@@ -458,7 +460,7 @@ class Interpreter
     protected function evaluateBoolExpression()
     {
         $result = $this->evaluateMathBlock();
-        while ($mathOp = $this->readChar()) {
+        while ($mathOp = $this->readChar(true)) {
             switch ($mathOp) {
                 case '+':
                     $result += $this->evaluateMathBlock();
@@ -500,9 +502,24 @@ class Interpreter
                         $result = $result < $this->evaluateMathBlock();
                     }
                     break;
+                case 'l': // check against regex
+                    $nextChar = $this->readChar(true);
+                    if ($nextChar == 'i') {
+                        $nextChar = $this->readChar(true);
+                        if ($nextChar == 'k') {
+                            $nextChar = $this->readChar(true);
+                            if ($nextChar == 'e') {
+                                $result = preg_match('#' . $this->evaluateBoolExpression() . '#', $result);
+                                break;
+                            }
+                        }
+                    }
+                    throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
+                break;
                 // Lower lever operators
-                case '&':
-                case '|':
+                case '&': // boolean "and" &&
+                case '|': // boolean "or" ||
+                case 'i': // find in set
                     // end of subexpression
                 case ')':
                     // end of statement
@@ -533,7 +550,7 @@ class Interpreter
          * otherwise cast type of result to boolean
          */
         $result = $this->evaluateBoolExpression();
-        while ($booleanOp = $this->readChar()) {
+        while ($booleanOp = $this->readChar(true)) {
             switch ($booleanOp) {
                 case '|':
                     $nextChar = $this->readChar();
