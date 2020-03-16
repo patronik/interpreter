@@ -217,7 +217,7 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function evaluateVariableAtom($char, &$atom)
+    protected function parseVariableAtom($char, &$atom)
     {
         // variable
         $varName = null;
@@ -238,7 +238,7 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function evaluateSingleQuotedStringAtom($char, &$atom)
+    protected function parseSingleQuotedStringAtom($char, &$atom)
     {
         // string in single quotes
         if ($char == "'") {
@@ -264,7 +264,7 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function evaluateDoubleQuotedStringAtom($char, &$atom)
+    protected function parseDoubleQuotedStringAtom($char, &$atom)
     {
         // string in double quotes
         if ($char == "\"") {
@@ -290,7 +290,7 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function evaluateNumberAtom($char, &$atom)
+    protected function parseNumberAtom($char, &$atom)
     {
         // number
         $asciiCode = ord($char);
@@ -315,12 +315,29 @@ class Interpreter
     }
 
     /**
+     * Like operator is called, check result against regular expression
+     *
+     * @param $result
+     * @throws Exception
+     */
+    protected function evaluateLikeExpression(&$result)
+    {
+        foreach (['i', 'k', 'e'] as $char) {
+            $nextChar = $this->readChar(true);
+            if ($nextChar != $char) {
+                throw new Exception('Unexpected token ' . $nextChar . '.');
+            }
+        }
+        $result = preg_match('#' . $this->evaluateBoolExpression() . '#', $result);
+    }
+
+    /**
      * The atomic (indivisible) part of math expression
      *
      * @return bool|int|mixed|string|null
      * @throws Exception
      */
-    protected function evaluateMathAtom()
+    protected function parseMathAtom()
     {
         $atom = null;
         $boolInversion = false;
@@ -365,10 +382,10 @@ class Interpreter
             return $atom;
         }
 
-        if (!$this->evaluateVariableAtom($atomChar, $atom)) {
-            if (!$this->evaluateNumberAtom($atomChar, $atom)) {
-                if (!$this->evaluateSingleQuotedStringAtom($atomChar, $atom)) {
-                    $this->evaluateDoubleQuotedStringAtom($atomChar, $atom);
+        if (!$this->parseVariableAtom($atomChar, $atom)) {
+            if (!$this->parseNumberAtom($atomChar, $atom)) {
+                if (!$this->parseSingleQuotedStringAtom($atomChar, $atom)) {
+                    $this->parseDoubleQuotedStringAtom($atomChar, $atom);
                 }
             }
         }
@@ -391,20 +408,20 @@ class Interpreter
      */
     protected function evaluateMathBlock()
     {
-        $result = $this->evaluateMathAtom();
+        $result = $this->parseMathAtom();
         while ($atomOp = $this->readChar(true)) {
             switch ($atomOp) {
                 case '*':
-                    $result *= $this->evaluateMathAtom();
+                    $result *= $this->parseMathAtom();
                     break;
                 case '/':
-                    $result /= $this->evaluateMathAtom();
+                    $result /= $this->parseMathAtom();
                     break;
                 case '.':
-                    $result .= $this->evaluateMathAtom();
+                    $result .= $this->parseMathAtom();
                     break;
                 case '%':
-                    $result %= $this->evaluateMathAtom();
+                    $result %= $this->parseMathAtom();
                     break;
                 case '+':
                     $nextChar = $this->readChar();
@@ -503,18 +520,7 @@ class Interpreter
                     }
                     break;
                 case 'l': // check against regex
-                    $nextChar = $this->readChar(true);
-                    if ($nextChar == 'i') {
-                        $nextChar = $this->readChar(true);
-                        if ($nextChar == 'k') {
-                            $nextChar = $this->readChar(true);
-                            if ($nextChar == 'e') {
-                                $result = preg_match('#' . $this->evaluateBoolExpression() . '#', $result);
-                                break;
-                            }
-                        }
-                    }
-                    throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
+                    $this->evaluateLikeExpression($result);
                 break;
                 // Lower lever operators
                 case '&': // boolean "and" &&
