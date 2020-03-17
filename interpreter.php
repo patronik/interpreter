@@ -9,7 +9,6 @@ class Interpreter
 {
     const STATEMENT_TYPE_RETURN = 'return';
     const STATEMENT_TYPE_IF     = 'if';
-    const STATEMENT_TYPE_ELSE   = 'else';
 
     protected $return = false;
 
@@ -24,18 +23,10 @@ class Interpreter
     protected $lastResult;
 
     /**
-     * The result of last if statement expression
-     *
+     * Flag determines whether last result will be returned from the program
      * @var
      */
-    protected $lastIfResult = [];
-
-    /**
-     * Path to current code block
-     *
-     * @var array
-     */
-    protected $scopePath = [];
+    protected $returnLast;
 
     /**
      * Variables
@@ -66,6 +57,14 @@ class Interpreter
     public function setVar($key, $val): void
     {
         $this->var[$key] = $val;
+    }
+
+    /**
+     * @param bool $val
+     */
+    public function setReturnLast(bool $val): void
+    {
+        $this->returnLast = $val;
     }
 
     /**
@@ -655,7 +654,61 @@ class Interpreter
         }
     }
 
-    protected function skipBlockOrSingleStatement()
+    /**
+     * Evaluate block or statement and read terminator symbol
+     *
+     * @throws Exception
+     */
+    protected function evaluateBlockOrStatement()
+    {
+        if (is_null($char = $this->readChar())) {
+            // EOF is achieved
+            return;
+        }
+
+        if ($char != '{') {
+            // evaluate 1 statement
+            $this->unreadChar();
+            $this->evaluateStatement();
+            if (($char = $this->readChar()) != ';') {
+                throw new Exception('Unexpected token ' . $char . '.');
+            }
+        } else {
+            $this->numOfOpenedBlocks++;
+            $depth = 0;
+            // evaluate 1 code block
+            $this->evaluateStatement();
+            while (!$this->return && $statementOp = $this->readChar()) {
+                switch ($statementOp) {
+                    case '{':
+                        $this->numOfOpenedBlocks++;
+                        $depth++;
+                    break;
+                    case '}':
+                        $this->numOfClosedBlocks++;
+                        if ($depth == 0) {
+                            return;
+                        }
+                        $depth--;
+                    break;
+                    // end of statement
+                    case ';':
+                        $this->evaluateStatement();
+                        break;
+                    default:
+                        throw new Exception('Unexpected token ' . $statementOp . '.');
+                    break;
+                }
+            }
+        }
+    }
+
+    /**
+     * Skip block or statement including terminator symbol
+     *
+     * @throws Exception
+     */
+    protected function skipBlockOrStatement()
     {
         if (is_null($char = $this->readChar())) {
             // EOF is achieved
@@ -670,9 +723,6 @@ class Interpreter
             // skip 1 code block
             $this->rewindUntil(['}'], '{');
         }
-
-        // tell parser to start evaluating next statement
-        $this->dynamicQueue[] = ';';
     }
 
     /**
@@ -709,60 +759,10 @@ class Interpreter
 
             // IF STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_IF) {
-                $char = $this->readChar();
-                if ($char != '(') {
-                    throw new Exception('Unexpected token ' . $char . '.');
-                }
-                $scopePathKey = implode('_', $this->scopePath);
-                $this->evaluateSubexpression(
-                    $char, $this->lastIfResult[$scopePathKey]
-                );
-                if (!$this->lastIfResult[$scopePathKey]) {
-                    $this->skipBlockOrSingleStatement();
-                } else {
-                    $this->dynamicQueue[] = ';';
-                }
+                $this->evaluateIfStructure();
                 return;
             }
             // END OF IF STATEMENT
-
-            // ELSE STATEMENT
-            if ($keyWord == self::STATEMENT_TYPE_ELSE) {
-                $scopePathKey = implode('_', $this->scopePath);
-                if (!isset($this->lastIfResult[$scopePathKey])) {
-                    throw new Exception('Else statement should follow if statement.');
-                }
-                if ($this->lastIfResult[$scopePathKey]) {
-                    // skip else if
-                    if ($char = $this->readChar() == 'i') {
-                        if ($nextChar = $this->readChar() == 'f') {
-                            $this->rewindUntil([')']);
-                        } else {
-                            throw new Exception('Unexpected token ' . $nextChar . '.');
-                        }
-                    } else {
-                        $this->unreadChar();
-                        // else statement should be last case of the "if" construction
-                        unset($this->lastIfResult[$scopePathKey]);
-                    }
-                    $this->skipBlockOrSingleStatement();
-                } else {
-                    if ($char = $this->readChar() == 'i') {
-                        if ($nextChar = $this->readChar() == 'f') {
-                            $this->unreadChar(2);
-                        } else {
-                            throw new Exception('Unexpected token ' . $nextChar . '.');
-                        }
-                    } else {
-                        $this->unreadChar();
-                        // else statement should be last case of the "if" construction
-                        unset($this->lastIfResult[$scopePathKey]);
-                    }
-                    $this->dynamicQueue[] = ';';
-                }
-                return;
-            }
-            // END OF ELSE STATEMENT
 
             // ASSIGNMENT STATEMENT
             if (!is_null($char = $this->readChar())) {
@@ -798,6 +798,81 @@ class Interpreter
         }
 
         $this->lastResult = $this->evaluateBoolStatement();
+    }
+
+    /**
+     * Evaluate if structure
+     *
+     * @throws Exception
+     */
+    protected function evaluateIfStructure()
+    {
+        $lastIfResult = null;
+        if (($char = $this->readChar()) != '(') {
+            throw new Exception('Unexpected token ' . $char . '.');
+        }
+        $this->evaluateSubexpression($char, $lastIfResult);
+
+        if ($lastIfResult) {
+            $this->evaluateBlockOrStatement();
+            if ($this->return) {
+                return;
+            }
+        } else {
+            $this->skipBlockOrStatement();
+        }
+
+        $elseFound = false;
+        while (!$this->return) {
+            if (($char = $this->readChar(true)) != 'e') {
+                if (!is_null($char)) {
+                    $this->unreadChar();
+                }
+                break;
+            }
+            foreach (['l', 's', 'e'] as $char) {
+                $nextChar = $this->readChar(true);
+                if ($nextChar != $char) {
+                    throw new Exception('Unexpected token ' . $nextChar . '.');
+                }
+            }
+            if (($char = $this->readChar(true)) == 'i') {
+                if ($nextChar = $this->readChar(true) != 'f') {
+                    throw new Exception('Unexpected token ' . $nextChar . '.');
+                }
+                if ($lastIfResult) {
+                    if (($char = $this->readChar(true)) != '(') {
+                        throw new Exception('Unexpected token ' . $char . '.');
+                    }
+                    $this->rewindUntil([')'], '(');
+                    $this->skipBlockOrStatement();
+                } else {
+                    if (($char = $this->readChar()) != '(') {
+                        throw new Exception('Unexpected token ' . $char . '.');
+                    }
+                    $this->evaluateSubexpression($char, $lastIfResult);
+                    if ($lastIfResult) {
+                        $this->evaluateBlockOrStatement();
+                    } else {
+                        $this->skipBlockOrStatement();
+                    }
+                }
+                continue;
+            } else {
+                if ($elseFound) {
+                    throw new Exception('Only 1 else statement can be used after if.');
+                }
+                $elseFound = true;
+                $this->unreadChar();
+                if ($lastIfResult) {
+                    $this->skipBlockOrStatement();
+                } else {
+                    $this->evaluateBlockOrStatement();
+                }
+            }
+        }
+        // Allow parser to continue with next statement
+        $this->dynamicQueue[] = ';';
     }
 
     /**
@@ -844,21 +919,17 @@ class Interpreter
         $this->numOfOpenedBlocks = 0;
         $this->numOfClosedBlocks = 0;
 
-        $this->scopePath[] = $this->numOfOpenedBlocks;
-
         $this->evaluateStatements();
         while (!$this->return && $separator = $this->readChar()) {
             switch ($separator) {
                 // start of block
                 case '{':
                     $this->numOfOpenedBlocks++;
-                    $this->scopePath[] = $this->numOfOpenedBlocks;
                     $this->evaluateStatements();
                     break;
                 // end of block
                 case '}':
                     $this->numOfClosedBlocks++;
-                    array_pop($this->scopePath);
                     $this->evaluateStatements();
                     break;
                 default:
@@ -873,6 +944,10 @@ class Interpreter
 
         if ($this->numOfOpenedBlocks != $this->numOfClosedBlocks) {
             throw new Exception('Wrong number of braces.');
+        }
+
+        if ($this->returnLast) {
+            return $this->lastResult;
         }
     }
 }
