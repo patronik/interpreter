@@ -841,7 +841,7 @@ class Interpreter
                     throw new Exception('Unexpected token ' . $nextChar . '.');
                 }
                 if ($lastIfResult) {
-                    if (($char = $this->readChar(true)) != '(') {
+                    if (($char = $this->readChar()) != '(') {
                         throw new Exception('Unexpected token ' . $char . '.');
                     }
                     $this->rewindUntil([')'], '(');
