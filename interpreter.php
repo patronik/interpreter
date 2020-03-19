@@ -251,6 +251,7 @@ class Interpreter
     {
         // string in single quotes
         if ($char == "'") {
+            $this->acceptEof = false;
             $atom = '';
             while (!is_null($char = $this->readChar(false, true))) {
                 if ($char != "'") {
@@ -262,6 +263,7 @@ class Interpreter
                 }
                 break;
             }
+            $this->acceptEof = true;
             return true;
         }
         return false;
@@ -277,6 +279,7 @@ class Interpreter
     {
         // string in double quotes
         if ($char == "\"") {
+            $this->acceptEof = false;
             $atom = "";
             while (!is_null($char = $this->readChar(false, true))) {
                 if ($char != "\"") {
@@ -288,6 +291,7 @@ class Interpreter
                 }
                 break;
             }
+            $this->acceptEof = true;
             return true;
         }
         return false;
@@ -358,8 +362,6 @@ class Interpreter
             return $atom;
         }
 
-        $this->acceptEof = false;
-
         // check for boolean inversion
         if ($atomChar == '!') {
             $boolInversion = true;
@@ -412,8 +414,6 @@ class Interpreter
         if (is_null($atom)) {
             throw new Exception('Unexpected token ' . $atomChar . '.');
         }
-
-        $this->acceptEof = true;
 
         return $atom;
     }
