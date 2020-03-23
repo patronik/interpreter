@@ -55,7 +55,7 @@ class Interpreter
     /**
      * Dynamic characters buffer
      */
-    protected $dynamicQueue = [];
+    protected $dynamicSrc = [];
 
     /**
      * @param string $key
@@ -108,8 +108,8 @@ class Interpreter
      */
     protected function readChar($toLower = false, $allChars = false)
     {
-        if (count($this->dynamicQueue)) {
-            return array_shift($this->dynamicQueue);
+        if (count($this->dynamicSrc)) {
+            return array_shift($this->dynamicSrc);
         }
         if (!$allChars) {
             $this->skipSpaces();
@@ -335,13 +335,15 @@ class Interpreter
      */
     protected function evaluateLikeExpression(&$result)
     {
+        $this->acceptEof = false;
         foreach (['i', 'k', 'e'] as $char) {
             $nextChar = $this->readChar(true);
             if ($nextChar != $char) {
                 throw new Exception('Unexpected token ' . $nextChar . '.');
             }
         }
-        $result = preg_match('#' . $this->evaluateBoolExpression() . '#', $result);
+        $this->acceptEof = true;
+        $result = preg_match('#' . $this->evaluateMathBlock() . '#', $result);
     }
 
     /**
@@ -668,9 +670,7 @@ class Interpreter
         $prevChar = null;
         while (!is_null($char = $this->readChar())) {
 
-            if ($this->acceptEof) {
-                $this->acceptEof = false;
-            }
+            $this->acceptEof = false;
 
             if ($char == "'") {
                 if (!$inSingleQuotedStr) {
@@ -817,6 +817,7 @@ class Interpreter
             // IF STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_IF) {
                 $this->evaluateIfStructure();
+                $this->dynamicSrc[] = ';';
                 return;
             }
             // END OF IF STATEMENT
@@ -928,12 +929,10 @@ class Interpreter
                 }
             }
         }
-        // Allow parser to continue with next statement
-        $this->dynamicQueue[] = ';';
     }
 
     /**
-     * Evaluate program statements one by one.
+     * Evaluate statements one by one.
      * Statement can be variable assignment, return statement, boolean|math expression etc.
      *
      * @return mixed
