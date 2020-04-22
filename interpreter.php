@@ -16,13 +16,6 @@ class Interpreter
     protected $numOfClosedBlocks = 0;
 
     /**
-     * Flag that determines whether end of file is expected
-     *
-     * @var bool
-     */
-    protected $acceptEof = true;
-
-    /**
      * Result of last executed statement
      *
      * @var
@@ -115,9 +108,6 @@ class Interpreter
             $this->skipSpaces();
         }
         if ($this->pos >= strlen($this->src)) {
-            if (!$this->acceptEof) {
-                throw new Exception('Unexpected end of file.');
-            }
             return null;
         }
         $char = $this->src[$this->pos++];
@@ -251,7 +241,6 @@ class Interpreter
     {
         // string in single quotes
         if ($char == "'") {
-            $this->acceptEof = false;
             $atom = '';
             while (!is_null($char = $this->readChar(false, true))) {
                 if ($char != "'") {
@@ -263,7 +252,6 @@ class Interpreter
                 }
                 break;
             }
-            $this->acceptEof = true;
             return true;
         }
         return false;
@@ -279,7 +267,6 @@ class Interpreter
     {
         // string in double quotes
         if ($char == "\"") {
-            $this->acceptEof = false;
             $atom = "";
             while (!is_null($char = $this->readChar(false, true))) {
                 if ($char != "\"") {
@@ -291,7 +278,6 @@ class Interpreter
                 }
                 break;
             }
-            $this->acceptEof = true;
             return true;
         }
         return false;
@@ -335,14 +321,12 @@ class Interpreter
      */
     protected function evaluateLikeExpression(&$result)
     {
-        $this->acceptEof = false;
         foreach (['i', 'k', 'e'] as $char) {
             $nextChar = $this->readChar(true);
             if ($nextChar != $char) {
                 throw new Exception('Unexpected token ' . $nextChar . '.');
             }
         }
-        $this->acceptEof = true;
         $result = preg_match('#' . $this->evaluateMathBlock() . '#', $result);
     }
 
@@ -431,43 +415,31 @@ class Interpreter
         while ($atomOp = $this->readChar(true)) {
             switch ($atomOp) {
                 case '*':
-                    $this->acceptEof = false;
                     $result *= $this->parseMathAtom();
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '/':
-                    $this->acceptEof = false;
                     $result /= $this->parseMathAtom();
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '.':
-                    $this->acceptEof = false;
                     $result .= $this->parseMathAtom();
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '%':
-                    $this->acceptEof = false;
                     $result %= $this->parseMathAtom();
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '+':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
                         $result++;
-                        $this->acceptEof = true;
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
                         return $result;
                     }
-                    break;
+                break;
                 case '-':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
                         $result--;
-                        $this->acceptEof = true;
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
@@ -511,37 +483,28 @@ class Interpreter
         while ($mathOp = $this->readChar(true)) {
             switch ($mathOp) {
                 case '+':
-                    $this->acceptEof = false;
                     $result += $this->evaluateMathBlock();
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '-':
-                    $this->acceptEof = false;
                     $result -= $this->evaluateMathBlock();
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '=':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
                         $result = $result == $this->evaluateMathBlock();
                     } else {
                         throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
                     }
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '!':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
                         $result = $result != $this->evaluateMathBlock();
                     } else {
                         throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
                     }
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '>':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
                         $result = $result >= $this->evaluateMathBlock();
@@ -549,10 +512,8 @@ class Interpreter
                         $this->unreadChar();
                         $result = $result > $this->evaluateMathBlock();
                     }
-                    $this->acceptEof = true;
-                    break;
+                break;
                 case '<':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
                         $result = $result <= $this->evaluateMathBlock();
@@ -560,12 +521,9 @@ class Interpreter
                         $this->unreadChar();
                         $result = $result < $this->evaluateMathBlock();
                     }
-                    $this->acceptEof = true;
                     break;
                 case 'l': // check against regex
-                    $this->acceptEof = false;
                     $this->evaluateLikeExpression($result);
-                    $this->acceptEof = true;
                 break;
                 // Lower lever operators
                 case '&': // boolean "and" &&
@@ -604,7 +562,6 @@ class Interpreter
         while ($booleanOp = $this->readChar(true)) {
             switch ($booleanOp) {
                 case '|':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '|') {
                         if ($result == true) {
@@ -612,17 +569,14 @@ class Interpreter
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
                             $this->unreadChar();
-                            $this->acceptEof = true;
                             return (bool) $result;
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
-                        $this->acceptEof = true;
                     } else {
                         throw new Exception('Unexpected token ' . $booleanOp . $nextChar . '.');
                     }
                     break;
                 case '&':
-                    $this->acceptEof = false;
                     $nextChar = $this->readChar();
                     if ($nextChar == '&') {
                         if ($result == false) {
@@ -630,11 +584,9 @@ class Interpreter
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
                             $this->unreadChar();
-                            $this->acceptEof = true;
                             return (bool) $result;
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
-                        $this->acceptEof = true;
                     } else {
                         throw new Exception('Unexpected token ' . $booleanOp . $nextChar . '.');
                     }
@@ -669,9 +621,6 @@ class Interpreter
 
         $prevChar = null;
         while (!is_null($char = $this->readChar())) {
-
-            $this->acceptEof = false;
-
             if ($char == "'") {
                 if (!$inSingleQuotedStr) {
                     if (!$inDoubleQuotedStr) {
@@ -707,8 +656,6 @@ class Interpreter
 
             $prevChar = $char;
         }
-
-        $this->acceptEof = true;
     }
 
     /**
@@ -718,7 +665,6 @@ class Interpreter
      */
     protected function evaluateBlockOrStatement()
     {
-        $this->acceptEof = false;
 
         if (($char = $this->readChar()) != '{') {
             // evaluate 1 statement
@@ -741,7 +687,6 @@ class Interpreter
                     case '}':
                         $this->numOfClosedBlocks++;
                         if ($depth == 0) {
-                            $this->acceptEof = true;
                             return;
                         }
                         $depth--;
@@ -756,8 +701,6 @@ class Interpreter
                 }
             }
         }
-
-        $this->acceptEof = true;
     }
 
     /**
