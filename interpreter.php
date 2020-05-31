@@ -16,6 +16,12 @@ class Interpreter
     protected $numOfClosedBlocks = 0;
 
     /**
+     * Holds the reference to last variable
+     * @var
+     */
+    protected $assignmentTarget;
+
+    /**
      * Result of last executed statement
      *
      * @var
@@ -164,7 +170,7 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function parseVariableName($char, &$varName)
+    protected function parseCharacterSequence($char, &$varName)
     {
         $asciiCode = ord($char);
         if ($asciiCode >= 65 && $asciiCode <= 90 // A-Z
@@ -211,6 +217,77 @@ class Interpreter
     }
 
     /**
+     * Parse target array element key for assignment
+     *
+     * @param array $keys
+     * @throws Exception
+     */
+    protected function parseArrayElementPath(&$keys = [])
+    {
+        $char = $this->readChar();
+        if ($char != '[') {
+            $this->unreadChar();
+            return;
+        }
+
+        do {
+            $key = $this->parseMathAtom();
+
+            if (is_null($key)) {
+                throw new Exception('Failed to parse array key.');
+            }
+            if (!is_int($key) && !is_string($key)) {
+                throw new Exception('Only string and integer array keys are supported.');
+            }
+
+            $keys[] = $key;
+
+            $char = $this->readChar();
+            if (is_null($char)) {
+                throw new Exception('Unexpected end of file.');
+            }
+            if ($char != ']') {
+                throw new Exception('Unexpected token ' . $char . '.');
+            }
+
+            $char = $this->readChar();
+        } while ($char == '[');
+
+        $this->unreadChar();
+    }
+
+    protected function parseArrayAtom($char, &$atom)
+    {
+        if ($char != '[') {
+            return false;
+        }
+        $array = [];
+        $implicitKey = 0;
+        do {
+            $keyOrVal = $this->parseMathAtom();
+            $nextChar = $this->readChar();
+            if (in_array($nextChar, [',',']'])) {
+                $array[$implicitKey++] = $keyOrVal;
+            } else if ($nextChar == '>') {
+                $arrayVal = $this->parseMathAtom();
+                if (is_numeric($keyOrVal) && $keyOrVal >= $implicitKey) {
+                    $implicitKey = $keyOrVal + 1;
+                }
+                $array[$keyOrVal] = $arrayVal;
+                $nextChar = $this->readChar();
+            }
+        } while ($nextChar == ',');
+
+        if ($nextChar != ']') {
+            throw new Exception('Unexpected token ' . $nextChar . '.');
+        }
+
+        $atom = $array;
+
+        return true;
+    }
+
+    /**
      * @param $char
      * @param $atom
      * @return bool
@@ -218,14 +295,35 @@ class Interpreter
      */
     protected function parseVariableAtom($char, &$atom)
     {
-        // variable
+        // variable|array element
         $varName = null;
-        if ($this->parseVariableName($char, $varName)) {
-            // The place where we can implement accessing object methods and properties
-            if (!isset($this->var[$varName])) {
-                throw new Exception('Variable ' . $varName . ' does not exist.');
+        if ($this->parseCharacterSequence($char, $varName)) {
+            $arrayElementKeys = [];
+            $this->parseArrayElementPath($arrayElementKeys);
+
+            if (count($arrayElementKeys)) {
+                // initialize to empty array if not exists
+                if (!isset($this->var[$varName])) {
+                    $this->var[$varName] = [];
+                }
+                $this->assignmentTarget =& $this->var[$varName];
+                foreach ($arrayElementKeys as $key => $arrayElementKey) {
+                    if ($key < (count($arrayElementKeys) - 1)) {
+                        if (!isset($this->assignmentTarget[$arrayElementKey])) {
+                            $this->assignmentTarget[$arrayElementKey] = [];
+                        }
+                    }
+                    $this->assignmentTarget =& $this->assignmentTarget[$arrayElementKey];
+                }
+            } else {
+                // initialize to null if not exists
+                if (!isset($this->var[$varName])) {
+                    $this->var[$varName] = null;
+                }
+                $this->assignmentTarget =& $this->var[$varName];
             }
-            $atom = $this->var[$varName];
+
+            $atom = $this->assignmentTarget;
             return true;
         }
         return false;
@@ -381,10 +479,12 @@ class Interpreter
             return $atom;
         }
 
-        if (!$this->parseVariableAtom($atomChar, $atom)) {
-            if (!$this->parseNumberAtom($atomChar, $atom)) {
-                if (!$this->parseSingleQuotedStringAtom($atomChar, $atom)) {
-                    $this->parseDoubleQuotedStringAtom($atomChar, $atom);
+        if (!$this->parseArrayAtom($atomChar, $atom)) {
+            if (!$this->parseVariableAtom($atomChar, $atom)) {
+                if (!$this->parseNumberAtom($atomChar, $atom)) {
+                    if (!$this->parseSingleQuotedStringAtom($atomChar, $atom)) {
+                        $this->parseDoubleQuotedStringAtom($atomChar, $atom);
+                    }
                 }
             }
         }
@@ -395,10 +495,6 @@ class Interpreter
 
         if ($boolInversion) {
             $atom = !$atom;
-        }
-
-        if (is_null($atom)) {
-            throw new Exception('Unexpected token ' . $atomChar . '.');
         }
 
         return $atom;
@@ -446,8 +542,20 @@ class Interpreter
                         return $result;
                     }
                     break;
+                case '=': // equality == or assignment
+                    $nextChar = $this->readChar();
+                    if ($nextChar == '=') {
+                        $this->unreadChar();
+                        return $result;
+                        break;
+                    } else {
+                        $this->unreadChar();
+                        // assign result to target (left side)
+                        $this->assignmentTarget = $this->evaluateBoolStatement();
+                        $result = $this->assignmentTarget;
+                    }
+                    break;
                 // Lower lever operators
-                case '=': // equality ===
                 case '!': // boolean not
                 case '>': // less than
                 case '<': // greater than
@@ -726,82 +834,6 @@ class Interpreter
     }
 
     /**
-     * Determine statement type and evaluate it
-     *
-     * @return void
-     * @throws Exception
-     */
-    protected function evaluateStatement()
-    {
-        if (is_null($char = $this->readChar())) {
-            // EOF is achieved
-            return;
-        }
-
-        // handle braces
-        if ($char == '{' || $char == '}') {
-            $this->unreadChar();
-            return;
-        }
-
-        $keyWord = null;
-        // handle variable assignment statement
-        if ($this->parseVariableName($char, $keyWord)) {
-            // The place where we can implement accessing object methods and properties
-
-            // RETURN STATEMENT
-            if ($keyWord == self::STATEMENT_TYPE_RETURN) {
-                $this->return = true;
-                $this->evaluateStatement();
-                return;
-            }
-            // END OF RETURN STATEMENT
-
-            // IF STATEMENT
-            if ($keyWord == self::STATEMENT_TYPE_IF) {
-                $this->evaluateIfStructure();
-                $this->dynamicSrc[] = ';';
-                return;
-            }
-            // END OF IF STATEMENT
-
-            // ASSIGNMENT STATEMENT
-            if (!is_null($char = $this->readChar())) {
-                if ($char == '=') {
-                    $nextChar = $this->readChar();
-                    // equality operator
-                    if ($nextChar == '=') {
-                        // unread last 2 chars
-                        $this->unreadChar(2);
-                        // unread variable name
-                        $this->unreadChar(strlen($keyWord));
-                    } else {
-                        // unread last char
-                        $this->unreadChar();
-                        // variable assignment
-                        $this->evaluateStatement();
-                        $this->var[$keyWord] = $this->lastResult;
-                        return;
-                    }
-                } else {
-                    // unread last char
-                    $this->unreadChar();
-                    // unread variable name
-                    $this->unreadChar(strlen($keyWord));
-                }
-            } else {
-                // unread variable name
-                $this->unreadChar(strlen($keyWord));
-            }
-            // END OF ASSIGNMENT STATEMENT
-        } else {
-            $this->unreadChar();
-        }
-
-        $this->lastResult = $this->evaluateBoolStatement();
-    }
-
-    /**
      * Evaluate if structure
      *
      * @throws Exception
@@ -872,6 +904,55 @@ class Interpreter
                 }
             }
         }
+    }
+
+    /**
+     * Determine statement type and evaluate it
+     *
+     * @return void
+     * @throws Exception
+     */
+    protected function evaluateStatement()
+    {
+        if (is_null($char = $this->readChar())) {
+            // EOF is achieved
+            return;
+        }
+
+        // handle braces
+        if ($char == '{' || $char == '}') {
+            $this->unreadChar();
+            return;
+        }
+
+        $keyWord = null;
+        // handle statements with preceding keywords
+        if ($this->parseCharacterSequence($char, $keyWord)) {
+            // The place where we can implement accessing object methods and properties
+
+            // RETURN STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_RETURN) {
+                $this->return = true;
+                $this->evaluateStatement();
+                return;
+            }
+            // END OF RETURN STATEMENT
+
+            // IF STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_IF) {
+                $this->evaluateIfStructure();
+                $this->dynamicSrc[] = ';';
+                return;
+            }
+            // END OF IF STATEMENT
+
+            // unread keyword
+            $this->unreadChar(strlen($keyWord));
+        } else {
+            $this->unreadChar();
+        }
+
+        $this->lastResult = $this->evaluateBoolStatement();
     }
 
     /**
