@@ -16,10 +16,10 @@ class Interpreter
     protected $numOfClosedBlocks = 0;
 
     /**
-     * Holds the reference to last variable
+     * Holds the references to assignment targets
      * @var
      */
-    protected $assignmentTarget;
+    protected $assignmentTarget = [];
 
     /**
      * Result of last executed statement
@@ -236,7 +236,7 @@ class Interpreter
             if (is_null($key)) {
                 throw new Exception('Failed to parse array key.');
             }
-            if (!is_int($key) && !is_string($key)) {
+            if (!is_numeric($key) && !is_string($key)) {
                 throw new Exception('Only string and integer array keys are supported.');
             }
 
@@ -268,13 +268,21 @@ class Interpreter
             $nextChar = $this->readChar();
             if (in_array($nextChar, [',',']'])) {
                 $array[$implicitKey++] = $keyOrVal;
-            } else if ($nextChar == '>') {
-                $arrayVal = $this->parseMathAtom();
-                if (is_numeric($keyOrVal) && $keyOrVal >= $implicitKey) {
-                    $implicitKey = $keyOrVal + 1;
-                }
-                $array[$keyOrVal] = $arrayVal;
+            } else if ($nextChar == '=') {
                 $nextChar = $this->readChar();
+                if ($nextChar == '>') {
+                    $arrayVal = $this->parseMathAtom();
+                    if (!is_numeric($keyOrVal) && !is_string($keyOrVal)) {
+                        throw new Exception('Only string and integer array keys are supported.');
+                    }
+                    if (is_numeric($keyOrVal) && $keyOrVal >= $implicitKey) {
+                        $implicitKey = $keyOrVal + 1;
+                    }
+                    $array[$keyOrVal] = $arrayVal;
+                    $nextChar = $this->readChar();
+                } else {
+                    throw new Exception('Unexpected token ' . $nextChar . '.');
+                }
             }
         } while ($nextChar == ',');
 
@@ -306,24 +314,26 @@ class Interpreter
                 if (!isset($this->var[$varName])) {
                     $this->var[$varName] = [];
                 }
-                $this->assignmentTarget =& $this->var[$varName];
+                $target =& $this->var[$varName];
                 foreach ($arrayElementKeys as $key => $arrayElementKey) {
                     if ($key < (count($arrayElementKeys) - 1)) {
-                        if (!isset($this->assignmentTarget[$arrayElementKey])) {
-                            $this->assignmentTarget[$arrayElementKey] = [];
+                        if (!isset($target[$arrayElementKey])) {
+                            $target[$arrayElementKey] = [];
                         }
                     }
-                    $this->assignmentTarget =& $this->assignmentTarget[$arrayElementKey];
+                    $target =& $target[$arrayElementKey];
                 }
             } else {
                 // initialize to null if not exists
                 if (!isset($this->var[$varName])) {
                     $this->var[$varName] = null;
                 }
-                $this->assignmentTarget =& $this->var[$varName];
+                $target =& $this->var[$varName];
             }
 
-            $atom = $this->assignmentTarget;
+            $this->assignmentTarget[] =& $target;
+
+            $atom = $target;
             return true;
         }
         return false;
@@ -551,8 +561,12 @@ class Interpreter
                     } else {
                         $this->unreadChar();
                         // assign result to target (left side)
-                        $this->assignmentTarget = $this->evaluateBoolStatement();
-                        $result = $this->assignmentTarget;
+                        if (!count($this->assignmentTarget)) {
+                            throw new Exception('Assignment target is missing');
+                        }
+                        $this->assignmentTarget[(count($this->assignmentTarget) - 1)] = $this->evaluateBoolStatement();
+                        $result = $this->assignmentTarget[(count($this->assignmentTarget) - 1)];
+                        array_pop($this->assignmentTarget);
                     }
                     break;
                 // Lower lever operators
