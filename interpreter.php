@@ -216,46 +216,6 @@ class Interpreter
         return false;
     }
 
-    /**
-     * Parse target array element key for assignment
-     *
-     * @param array $keys
-     * @throws Exception
-     */
-    protected function parseArrayElementPath(&$keys = [])
-    {
-        $char = $this->readChar();
-        if ($char != '[') {
-            $this->unreadChar();
-            return;
-        }
-
-        do {
-            $key = $this->parseMathAtom();
-
-            if (is_null($key)) {
-                throw new Exception('Failed to parse array key.');
-            }
-            if (!is_numeric($key) && !is_string($key)) {
-                throw new Exception('Only string and integer array keys are supported.');
-            }
-
-            $keys[] = $key;
-
-            $char = $this->readChar();
-            if (is_null($char)) {
-                throw new Exception('Unexpected end of file.');
-            }
-            if ($char != ']') {
-                throw new Exception('Unexpected token ' . $char . '.');
-            }
-
-            $char = $this->readChar();
-        } while ($char == '[');
-
-        $this->unreadChar();
-    }
-
     protected function parseArrayAtom($char, &$atom)
     {
         if ($char != '[') {
@@ -296,6 +256,67 @@ class Interpreter
     }
 
     /**
+     * @param $varName
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function parseArrayElementAtom($varName, &$atom)
+    {
+        // array element
+        $char = $this->readChar();
+        if ($char != '[') {
+            $this->unreadChar();
+            return false;
+        }
+
+        $elementKeys = [];
+        do {
+            $key = $this->parseMathAtom();
+
+            if (is_null($key)) {
+                throw new Exception('Failed to parse array key.');
+            }
+            if (!is_numeric($key) && !is_string($key)) {
+                throw new Exception('Only string and integer array keys are supported.');
+            }
+
+            $elementKeys[] = $key;
+
+            $char = $this->readChar();
+            if (is_null($char)) {
+                throw new Exception('Unexpected end of file.');
+            }
+            if ($char != ']') {
+                throw new Exception('Unexpected token ' . $char . '.');
+            }
+
+            $char = $this->readChar();
+        } while ($char == '[');
+
+        $this->unreadChar();
+
+        // initialize to empty array if not exists
+        if (!isset($this->var[$varName])) {
+            $this->var[$varName] = [];
+        }
+        $target =& $this->var[$varName];
+        foreach ($elementKeys as $key => $elementKey) {
+            if ($key < (count($elementKeys) - 1)) {
+                if (!isset($target[$elementKey])) {
+                    $target[$elementKey] = [];
+                }
+            }
+            $target =& $target[$elementKey];
+        }
+
+        $this->assignmentTarget[] =& $target;
+
+        $atom = $target;
+        return true;
+    }
+
+    /**
      * @param $char
      * @param $atom
      * @return bool
@@ -303,33 +324,18 @@ class Interpreter
      */
     protected function parseVariableAtom($char, &$atom)
     {
-        // variable|array element
+        // variable
         $varName = null;
         if ($this->parseCharacterSequence($char, $varName)) {
-            $arrayElementKeys = [];
-            $this->parseArrayElementPath($arrayElementKeys);
-
-            if (count($arrayElementKeys)) {
-                // initialize to empty array if not exists
-                if (!isset($this->var[$varName])) {
-                    $this->var[$varName] = [];
-                }
-                $target =& $this->var[$varName];
-                foreach ($arrayElementKeys as $key => $arrayElementKey) {
-                    if ($key < (count($arrayElementKeys) - 1)) {
-                        if (!isset($target[$arrayElementKey])) {
-                            $target[$arrayElementKey] = [];
-                        }
-                    }
-                    $target =& $target[$arrayElementKey];
-                }
-            } else {
-                // initialize to null if not exists
-                if (!isset($this->var[$varName])) {
-                    $this->var[$varName] = null;
-                }
-                $target =& $this->var[$varName];
+            // try to parse array element
+            if ($this->parseArrayElementAtom($varName, $atom)) {
+                return true;
             }
+            // initialize to null if not exists
+            if (!isset($this->var[$varName])) {
+                $this->var[$varName] = null;
+            }
+            $target =& $this->var[$varName];
 
             $this->assignmentTarget[] =& $target;
 
