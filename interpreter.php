@@ -7,8 +7,9 @@
 
 class Interpreter
 {
-    const STATEMENT_TYPE_RETURN = 'return';
-    const STATEMENT_TYPE_IF     = 'if';
+    const STATEMENT_TYPE_FUNCTION = 'function';
+    const STATEMENT_TYPE_RETURN   = 'return';
+    const STATEMENT_TYPE_IF       = 'if';
 
     protected $return = false;
 
@@ -33,6 +34,13 @@ class Interpreter
      * @var
      */
     protected $returnLast;
+
+    /**
+     * Defined functions
+     *
+     * @var
+     */
+    protected $functions = [];
 
     /**
      * Variables
@@ -878,6 +886,49 @@ class Interpreter
     }
 
     /**
+     * Parse function
+     */
+    protected function parseFunction()
+    {
+        $char = $this->readChar();
+        $functionName = null;
+        if (!$this->parseCharacterSequence($char, $functionName)) {
+            throw new Exception('Failed to parse function name.');
+        }
+
+        if (isset($this->functions[$functionName])) {
+            throw new Exception('Function ' . $functionName . ' already exists.');
+        }
+
+        if (($char = $this->readChar()) != '(') {
+            throw new Exception('Unexpected token ' . $char . '.');
+        }
+
+        $arguments = [];
+        do {
+            $char = $this->readChar();
+            $argName = null;
+            if ($this->parseCharacterSequence($char, $argName)) {
+                $arguments[] = $argName;
+            } else {
+                throw new Exception('Unexpected token ' . $char . '.');
+            }
+            $char = $this->readChar();
+        } while ($char == ',');
+
+        if ($char != ')') {
+            throw new Exception('Unexpected token ' . $char . '.');
+        }
+
+        $this->functions[$functionName] = [
+            'pos' => $this->pos,
+            'args' => $arguments
+        ];
+
+        $this->skipBlockOrStatement();
+    }
+
+    /**
      * Evaluate if structure
      *
      * @throws Exception
@@ -972,7 +1023,14 @@ class Interpreter
         $keyWord = null;
         // handle statements with preceding keywords
         if ($this->parseCharacterSequence($char, $keyWord)) {
-            // The place where we can implement accessing object methods and properties
+
+            // FUNCTION DEFINITION
+            if ($keyWord == self::STATEMENT_TYPE_FUNCTION) {
+                $this->parseFunction();
+                $this->dynamicSrc[] = ';';
+                return;
+            }
+            // FUNCTION DEFINITION
 
             // RETURN STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_RETURN) {
