@@ -42,6 +42,13 @@ class Interpreter
     protected $var = [];
 
     /**
+     * Storage used by functions
+     *
+     * @var array
+     */
+    protected $stack = [];
+
+    /**
      * @var string
      */
     protected $src;
@@ -62,7 +69,8 @@ class Interpreter
      */
     public function setVar($key, $val): void
     {
-        $this->var[$key] = $val;
+        $storage =& $this->getStorageRef();
+        $storage[$key] = $val;
     }
 
     /**
@@ -71,6 +79,19 @@ class Interpreter
     public function setReturnLast(bool $val): void
     {
         $this->returnLast = $val;
+    }
+
+    /**
+     * Returns a reference to variable storage
+     *
+     * @return array
+     */
+    protected function &getStorageRef()
+    {
+        if (count($this->stack) > 0) {
+            return $this->stack[count($this->stack) - 1];
+        }
+        return $this->var;
     }
 
     /**
@@ -296,11 +317,12 @@ class Interpreter
 
         $this->unreadChar();
 
+        $storage =& $this->getStorageRef();
         // initialize to empty array if not exists
-        if (!isset($this->var[$varName])) {
-            $this->var[$varName] = [];
+        if (!isset($storage[$varName])) {
+            $storage[$varName] = [];
         }
-        $target =& $this->var[$varName];
+        $target =& $storage[$varName];
         foreach ($elementKeys as $key => $elementKey) {
             if ($key < (count($elementKeys) - 1)) {
                 if (!isset($target[$elementKey])) {
@@ -331,11 +353,13 @@ class Interpreter
             if ($this->parseArrayElementAtom($varName, $atom)) {
                 return true;
             }
+
+            $storage =& $this->getStorageRef();
             // initialize to null if not exists
-            if (!isset($this->var[$varName])) {
-                $this->var[$varName] = null;
+            if (!isset($storage[$varName])) {
+                $storage[$varName] = null;
             }
-            $target =& $this->var[$varName];
+            $target =& $storage[$varName];
 
             $this->assignmentTarget[] =& $target;
 
