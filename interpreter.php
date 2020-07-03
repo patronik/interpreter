@@ -7,7 +7,7 @@
 
 class Interpreter
 {
-    const STATEMENT_TYPE_FUNCTION = 'function';
+    const STATEMENT_TYPE_SUB      = 'sub';
     const STATEMENT_TYPE_RETURN   = 'return';
     const STATEMENT_TYPE_IF       = 'if';
 
@@ -245,6 +245,14 @@ class Interpreter
         return false;
     }
 
+    /**
+     * Parse array
+     *
+     * @param $char
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
     protected function parseArrayAtom($char, &$atom)
     {
         if ($char != '[') {
@@ -280,6 +288,79 @@ class Interpreter
         }
 
         $atom = $array;
+
+        return true;
+    }
+
+    /**
+     * @param $varName
+     * @param $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function parseFunctionCallAtom($varName, &$atom)
+    {
+        // check if function exists
+        if (!isset($this->functions[$varName])) {
+            return false;
+        }
+
+        // function call left bracket
+        $char = $this->readChar();
+        if ($char != '(') {
+            $this->unreadChar();
+            return false;
+        }
+
+        $functionStack = [];
+        $char = $this->readChar();
+        if ($char != ')') {
+            $this->unreadChar();
+            // parse arguments
+            $argPos = 0;
+            do {
+                if (isset($this->functions[$varName]['args'][$argPos])) {
+                    $functionStack[$this->functions[$varName]['args'][$argPos]] = $this->evaluateBoolStatement();
+                } else {
+                    $functionStack[] = $this->evaluateBoolStatement();
+                }
+                $argPos++;
+                $char = $this->readChar();
+            } while ($char == ',');
+        }
+
+        if ($char != ')') {
+            throw new Exception('Unexpected token ' . $char . '.');
+        }
+
+        $this->stack[] = $functionStack;
+
+        // save current state
+        $prevPos = $this->pos;
+        $prevRet = $this->return;
+        $prevRes = $this->lastResult;
+        $prevOpened = $this->numOfOpenedBlocks;
+        $prevClosed = $this->numOfClosedBlocks;
+        $prevTargets = $this->assignmentTarget;
+
+        $this->assignmentTarget = [];
+        $this->pos = $this->functions[$varName]['pos'];
+        $this->return = false;
+
+        $atom = null;
+        $this->evaluateBlockOrStatement();
+        if ($this->return) {
+            $atom = $this->lastResult;
+            $this->numOfOpenedBlocks = $prevOpened;
+            $this->numOfClosedBlocks = $prevClosed;
+        }
+        array_pop($this->stack);
+
+        // restore state
+        $this->assignmentTarget = $prevTargets;
+        $this->lastResult = $prevRes;
+        $this->return = $prevRet;
+        $this->pos = $prevPos;
 
         return true;
     }
@@ -357,6 +438,11 @@ class Interpreter
         // variable
         $varName = null;
         if ($this->parseCharacterSequence($char, $varName)) {
+            // try to process function call atom
+            if ($this->parseFunctionCallAtom($varName, $atom)) {
+                return true;
+            }
+
             // try to parse array element
             if ($this->parseArrayElementAtom($varName, $atom)) {
                 return true;
@@ -615,9 +701,11 @@ class Interpreter
                 case '|': // boolean "or" ||
                 case 'l': // check against regex
                 case 'i': // find in set
-                    // end of subexpression
+                // end of argument or statement
+                case ',':
+                // end of subexpression
                 case ')':
-                    // end of statement
+                // end of statement
                 case ';':
                     // start of statement block
                     $this->unreadChar();
@@ -689,9 +777,11 @@ class Interpreter
                 case '&': // boolean "and" &&
                 case '|': // boolean "or" ||
                 case 'i': // find in set
-                    // end of subexpression
+                // end of argument or statement
+                case ',':
+                // end of subexpression
                 case ')':
-                    // end of statement
+                // end of statement
                 case ';':
                     // start of statement block
                     $this->unreadChar();
@@ -751,9 +841,11 @@ class Interpreter
                         throw new Exception('Unexpected token ' . $booleanOp . $nextChar . '.');
                     }
                     break;
+                // end of argument
+                case ',':
                 // end of subexpression
                 case ')':
-                    // end of statement
+                // end of statement
                 case ';':
                     $this->unreadChar();
                     // return result from recursive call
@@ -825,7 +917,6 @@ class Interpreter
      */
     protected function evaluateBlockOrStatement()
     {
-
         if (($char = $this->readChar()) != '{') {
             // evaluate 1 statement
             $this->unreadChar();
@@ -904,12 +995,16 @@ class Interpreter
             throw new Exception('Unexpected token ' . $char . '.');
         }
 
-        $arguments = [];
+        $parameters = [];
         do {
             $char = $this->readChar();
+            // function without parameters
+            if ($char == ')') {
+                break;
+            }
             $argName = null;
             if ($this->parseCharacterSequence($char, $argName)) {
-                $arguments[] = $argName;
+                $parameters[] = $argName;
             } else {
                 throw new Exception('Unexpected token ' . $char . '.');
             }
@@ -922,7 +1017,7 @@ class Interpreter
 
         $this->functions[$functionName] = [
             'pos' => $this->pos,
-            'args' => $arguments
+            'args' => $parameters
         ];
 
         $this->skipBlockOrStatement();
@@ -1025,7 +1120,7 @@ class Interpreter
         if ($this->parseCharacterSequence($char, $keyWord)) {
 
             // FUNCTION DEFINITION
-            if ($keyWord == self::STATEMENT_TYPE_FUNCTION) {
+            if ($keyWord == self::STATEMENT_TYPE_SUB) {
                 $this->parseFunction();
                 $this->dynamicSrc[] = ';';
                 return;
@@ -1043,7 +1138,9 @@ class Interpreter
             // IF STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_IF) {
                 $this->evaluateIfStructure();
-                $this->dynamicSrc[] = ';';
+                if (!$this->return) {
+                    $this->dynamicSrc[] = ';';
+                }
                 return;
             }
             // END OF IF STATEMENT
@@ -1075,6 +1172,7 @@ class Interpreter
                     return;
                     break;
                 // end of statement
+                case ',':
                 case ';':
                     $this->evaluateStatement();
                     break;

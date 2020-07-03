@@ -6,6 +6,13 @@ This is an interpreter - enhanced calculator. Has basic math features and variab
 ## Why do we need this?
 Sometimes you just want to know how things work. Then you read about interpreters and sometimes you try to create your own. Created with educational purposes.
 
+## Supported features
+1. Math operations
+2. Variables
+3. Integer and associative arrays
+4. Conditional operator
+5. Subprograms (functions)
+
 ## Usage
 
 ```
