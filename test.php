@@ -5,9 +5,11 @@ error_reporting(E_ALL);
 
 require_once 'interpreter.php';
 
-$code = '2 + 2;';
+$code = '
+2 + 2;
+';
 echo "addition<br/>";
-echo "code: <b>" . $code . "</b><br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
 try {
     $inter = new Interpreter();
     $inter->setReturnLast(true);
@@ -19,9 +21,11 @@ try {
     echo $e->getMessage();
 }
 
-$code = '2 - 1;';
+$code = '
+2 - 1;
+';
 echo "subtraction<br/>";
-echo "code: <b>" . $code . "</b><br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
 try {
     $inter = new Interpreter();
     $inter->setReturnLast(true);
@@ -39,7 +43,7 @@ b = 14;
 return a + b * 2;
 ';
 echo "variables<br/>";
-echo "code: <b>" . $code . "</b><br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
 try {
     $inter = new Interpreter();
     $inter->setReturnLast(true);
@@ -59,7 +63,7 @@ students = [
 return students["Bogdan"]["age"] > students["Stepan"]["age"];
 ';
 echo "arrays<br/>";
-echo "code: <b>" . $code . "</b><br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
 try {
     $inter = new Interpreter();
     $inter->setReturnLast(true);
@@ -73,13 +77,14 @@ try {
 
 
 
-$code = 'if (2 > 1) {
+$code = '
+if (2 > 1) {
     return 5;
 } else {
     return 4;
 }';
 echo "conditional operator<br/>";
-echo "code: <b>" . $code . "</b><br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
 try {
     $inter = new Interpreter();
     $inter->setReturnLast(true);
@@ -91,19 +96,55 @@ try {
     echo $e->getMessage();
 }
 
-$code = 'sub add(a,b) {
+$code = '
+sub add(a,b) {
 return a + b;
 }
 return add(5,5);
 ';
 echo "subprogram<br/>";
-echo "code: <b>" . $code . "</b><br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
 try {
     $inter = new Interpreter();
     $inter->setReturnLast(true);
     $res = $inter->evaluate($code);
     echo "res: " . $res . "<br/>";
     echo ($res == 10) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+
+$code = '
+a = 2 + 2;
+if (a > 5) {
+ b = 6;
+} else {
+ b = 9;
+}
+sub max(x,y) {
+    if (x > y) {
+        return x;
+    }
+    return y;
+}
+sub min(x,y) {
+    if (x < y) {
+        return x;
+    }
+    return y;
+}
+result = ["max" => max(a,b), "min" => min(a,b)];
+return result["max"] + result["min"];
+';
+echo "multiple features<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 13) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
     echo $e->getMessage();
