@@ -342,7 +342,9 @@ class Interpreter
         $prevOpened = $this->numOfOpenedBlocks;
         $prevClosed = $this->numOfClosedBlocks;
         $prevTargets = $this->assignmentTarget;
+        $prevDynamicSrc = $this->dynamicSrc;
 
+        $this->dynamicSrc = [];
         $this->assignmentTarget = [];
         $this->pos = $this->functions[$varName]['pos'];
         $this->return = false;
@@ -357,6 +359,7 @@ class Interpreter
         array_pop($this->stack);
 
         // restore state
+        $this->dynamicSrc = $prevDynamicSrc;
         $this->assignmentTarget = $prevTargets;
         $this->lastResult = $prevRes;
         $this->return = $prevRet;
