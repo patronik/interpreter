@@ -10,8 +10,22 @@ class Interpreter
     const STATEMENT_TYPE_SUB      = 'sub';
     const STATEMENT_TYPE_RETURN   = 'return';
     const STATEMENT_TYPE_IF       = 'if';
+    const STATEMENT_TYPE_BREAK    = 'break';
+    const STATEMENT_TYPE_FOR      = 'for';
 
+    /**
+     * Flag that shows whether return from script or function should be done
+     *
+     * @var bool
+     */
     protected $return = false;
+
+    /**
+     * Breaks loop execution
+     *
+     * @var bool
+     */
+    protected $break = false;
 
     /**
      * Holds the references to assignment targets
@@ -1017,6 +1031,63 @@ class Interpreter
     }
 
     /**
+     * Execute for loop
+     */
+    protected function evaluateForLoop()
+    {
+        if (($char = $this->readChar()) != '(') {
+            throw new Exception('Unexpected token ' . $char . '.');
+        }
+        /**
+         * Initializer statement
+         */
+        $this->evaluateStatement();
+
+        if (($char = $this->readChar()) != ';') {
+            throw new Exception('Unexpected token ' . $char . '.');
+        }
+
+        $blockStartPos = null;
+        $conditionPos = $this->pos;
+        $afterStatementPos = null;
+
+        do {
+            $this->evaluateStatement();
+            if (($char = $this->readChar()) != ';') {
+                throw new Exception('Unexpected token ' . $char . '.');
+            }
+            if ($this->lastResult) {
+                if (is_null($afterStatementPos)) {
+                    $afterStatementPos = $this->pos;
+                }
+                $this->rewindUntil([')'], '(');
+                if (is_null($blockStartPos)) {
+                    $blockStartPos = $this->pos;
+                }
+                $this->evaluateBlockOrStatement();
+                if ($this->break || $this->return) {
+                    break;
+                }
+
+                // Evaluate after statement
+                $this->pos = $afterStatementPos;
+                $this->evaluateStatement();
+
+                // Prepare for next iteration
+                $this->pos = $conditionPos;
+            } else {
+                break;
+            }
+        } while(true);
+
+        $this->pos = $conditionPos;
+        $this->rewindUntil([')'], '(');
+        $this->skipBlockOrStatement();
+
+        $this->break = false;
+    }
+
+    /**
      * Evaluate if structure
      *
      * @throws Exception
@@ -1128,6 +1199,13 @@ class Interpreter
             }
             // END OF RETURN STATEMENT
 
+            // BREAK LOOP STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_BREAK) {
+                $this->break = true;
+                return;
+            }
+            // END OF BREAK LOOP STATEMENT
+
             // IF STATEMENT
             if ($keyWord == self::STATEMENT_TYPE_IF) {
                 $this->evaluateIfStructure();
@@ -1137,6 +1215,16 @@ class Interpreter
                 return;
             }
             // END OF IF STATEMENT
+
+            // FOR STATEMENT
+            if ($keyWord == self::STATEMENT_TYPE_FOR) {
+                $this->evaluateForLoop();
+                if (!$this->return) {
+                    $this->dynamicSrc[] = ';';
+                }
+                return;
+            }
+            // END OF FOR STATEMENT
 
             // unread keyword
             $this->unreadChar(strlen($keyWord));

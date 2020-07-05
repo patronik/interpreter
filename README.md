@@ -11,7 +11,8 @@ Sometimes you just want to know how things work. Then you read about interpreter
 2. Variables
 3. Integer and associative arrays
 4. Conditional operator
-5. Subprograms (functions)
+5. For loop
+6. Subprograms (functions)
 
 ## Usage
 
