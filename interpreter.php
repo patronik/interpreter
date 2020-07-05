@@ -13,9 +13,6 @@ class Interpreter
 
     protected $return = false;
 
-    protected $numOfOpenedBlocks = 0;
-    protected $numOfClosedBlocks = 0;
-
     /**
      * Holds the references to assignment targets
      * @var
@@ -339,8 +336,6 @@ class Interpreter
         $prevPos = $this->pos;
         $prevRet = $this->return;
         $prevRes = $this->lastResult;
-        $prevOpened = $this->numOfOpenedBlocks;
-        $prevClosed = $this->numOfClosedBlocks;
         $prevTargets = $this->assignmentTarget;
         $prevDynamicSrc = $this->dynamicSrc;
 
@@ -353,8 +348,6 @@ class Interpreter
         $this->evaluateBlockOrStatement();
         if ($this->return) {
             $atom = $this->lastResult;
-            $this->numOfOpenedBlocks = $prevOpened;
-            $this->numOfClosedBlocks = $prevClosed;
         }
         array_pop($this->stack);
 
@@ -928,18 +921,15 @@ class Interpreter
                 throw new Exception('Unexpected token ' . $char . '.');
             }
         } else {
-            $this->numOfOpenedBlocks++;
             $depth = 0;
             // evaluate 1 code block
             $this->evaluateStatement();
             while (!$this->return && $statementOp = $this->readChar()) {
                 switch ($statementOp) {
                     case '{':
-                        $this->numOfOpenedBlocks++;
                         $depth++;
                     break;
                     case '}':
-                        $this->numOfClosedBlocks++;
                         if ($depth == 0) {
                             return;
                         }
@@ -1199,20 +1189,15 @@ class Interpreter
         $this->src = $code;
         $this->pos = $pos;
 
-        $this->numOfOpenedBlocks = 0;
-        $this->numOfClosedBlocks = 0;
-
         $this->evaluateStatements();
         while (!$this->return && $separator = $this->readChar()) {
             switch ($separator) {
                 // start of block
                 case '{':
-                    $this->numOfOpenedBlocks++;
                     $this->evaluateStatements();
                     break;
                 // end of block
                 case '}':
-                    $this->numOfClosedBlocks++;
                     $this->evaluateStatements();
                     break;
                 default:
@@ -1223,10 +1208,6 @@ class Interpreter
 
         if ($this->return) {
             return $this->lastResult;
-        }
-
-        if ($this->numOfOpenedBlocks != $this->numOfClosedBlocks) {
-            throw new Exception('Wrong number of braces.');
         }
 
         if ($this->returnLast) {
