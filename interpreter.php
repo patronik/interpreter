@@ -28,12 +28,6 @@ class Interpreter
     protected $break = false;
 
     /**
-     * Holds the references to assignment targets
-     * @var
-     */
-    protected $assignmentTarget = [];
-
-    /**
      * Result of last executed statement
      *
      * @var
@@ -184,21 +178,34 @@ class Interpreter
      *
      * @param $operator
      * @param $val
+     * @param $targetReference
      * @return int
      */
-    protected function applyPreOperator($operator, $val)
+    protected function applyPreOperator($operator, $val, array &$targetReference = [])
     {
         switch ($operator) {
             case '-' :
+                if ($targetReference['is_set']) {
+                    $targetReference['ref'] = -$targetReference;
+                }
                 return -$val;
                 break;
             case '+' :
+                if ($targetReference['is_set']) {
+                    $targetReference['ref'] = +$targetReference;
+                }
                 return +$val;
                 break;
             case '++' :
+                if ($targetReference['is_set']) {
+                    ++$targetReference['ref'];
+                }
                 return ++$val;
                 break;
             case '--' :
+                if ($targetReference['is_set']) {
+                    --$targetReference['ref'];
+                }
                 return --$val;
                 break;
         }
@@ -272,14 +279,14 @@ class Interpreter
         $array = [];
         $implicitKey = 0;
         do {
-            $keyOrVal = $this->parseMathAtom();
+            $keyOrVal = $this->parseAtom();
             $nextChar = $this->readChar();
             if (in_array($nextChar, [',',']'])) {
                 $array[$implicitKey++] = $keyOrVal;
             } else if ($nextChar == '=') {
                 $nextChar = $this->readChar();
                 if ($nextChar == '>') {
-                    $arrayVal = $this->parseMathAtom();
+                    $arrayVal = $this->parseAtom();
                     if (!is_numeric($keyOrVal) && !is_string($keyOrVal)) {
                         throw new Exception('Only string and integer array keys are supported.');
                     }
@@ -350,11 +357,9 @@ class Interpreter
         $prevPos = $this->pos;
         $prevRet = $this->return;
         $prevRes = $this->lastResult;
-        $prevTargets = $this->assignmentTarget;
         $prevDynamicSrc = $this->dynamicSrc;
 
         $this->dynamicSrc = [];
-        $this->assignmentTarget = [];
         $this->pos = $this->functions[$varName]['pos'];
         $this->return = false;
 
@@ -367,7 +372,6 @@ class Interpreter
 
         // restore state
         $this->dynamicSrc = $prevDynamicSrc;
-        $this->assignmentTarget = $prevTargets;
         $this->lastResult = $prevRes;
         $this->return = $prevRet;
         $this->pos = $prevPos;
@@ -378,10 +382,11 @@ class Interpreter
     /**
      * @param $varName
      * @param $atom
+     * @param array $targetReference
      * @return bool
      * @throws Exception
      */
-    protected function parseArrayElementAtom($varName, &$atom)
+    protected function parseArrayElementAtom($varName, &$atom, array &$targetReference = [])
     {
         // array element
         $char = $this->readChar();
@@ -392,7 +397,7 @@ class Interpreter
 
         $elementKeys = [];
         do {
-            $key = $this->parseMathAtom();
+            $key = $this->parseAtom();
 
             if (is_null($key)) {
                 throw new Exception('Failed to parse array key.');
@@ -431,7 +436,8 @@ class Interpreter
             $target =& $target[$elementKey];
         }
 
-        $this->assignmentTarget[] =& $target;
+        $targetReference['is_set'] = true;
+        $targetReference['ref'] =& $target;
 
         $atom = $target;
         return true;
@@ -440,10 +446,11 @@ class Interpreter
     /**
      * @param $char
      * @param $atom
+     * @param array $targetReference
      * @return bool
      * @throws Exception
      */
-    protected function parseVariableAtom($char, &$atom)
+    protected function parseVariableAtom($char, &$atom, array &$targetReference = [])
     {
         // variable
         $varName = null;
@@ -454,7 +461,7 @@ class Interpreter
             }
 
             // try to parse array element
-            if ($this->parseArrayElementAtom($varName, $atom)) {
+            if ($this->parseArrayElementAtom($varName, $atom, $targetReference)) {
                 return true;
             }
 
@@ -465,7 +472,8 @@ class Interpreter
             }
             $target =& $storage[$varName];
 
-            $this->assignmentTarget[] =& $target;
+            $targetReference['is_set'] = true;
+            $targetReference['ref'] =& $target;
 
             $atom = $target;
             return true;
@@ -573,12 +581,13 @@ class Interpreter
     }
 
     /**
-     * The atomic (indivisible) part of math expression
+     * The atomic (non dividable) part of expression
      *
+     * @param array $targetReference
      * @return bool|int|mixed|string|null
      * @throws Exception
      */
-    protected function parseMathAtom()
+    protected function parseAtom(array &$targetReference = [])
     {
         $atom = null;
         $boolInversion = false;
@@ -623,8 +632,8 @@ class Interpreter
             return $atom;
         }
 
-        if (!$this->parseArrayAtom($atomChar, $atom)) {
-            if (!$this->parseVariableAtom($atomChar, $atom)) {
+        if (!$this->parseVariableAtom($atomChar, $atom, $targetReference)) {
+            if (!$this->parseArrayAtom($atomChar, $atom)) {
                 if (!$this->parseNumberAtom($atomChar, $atom)) {
                     if (!$this->parseSingleQuotedStringAtom($atomChar, $atom)) {
                         $this->parseDoubleQuotedStringAtom($atomChar, $atom);
@@ -634,7 +643,7 @@ class Interpreter
         }
 
         if ($preOperator) {
-            $atom = $this->applyPreOperator($preOperator, $atom);
+            $atom = $this->applyPreOperator($preOperator, $atom, $targetReference);
         }
 
         if ($boolInversion) {
@@ -651,24 +660,28 @@ class Interpreter
      */
     protected function evaluateMathBlock()
     {
-        $result = $this->parseMathAtom();
+        $targetReference = ['is_set' => false, 'ref' => null];
+        $result = $this->parseAtom($targetReference);
         while ($atomOp = $this->readChar(true)) {
             switch ($atomOp) {
                 case '*':
-                    $result *= $this->parseMathAtom();
+                    $result *= $this->parseAtom($targetReference);
                 break;
                 case '/':
-                    $result /= $this->parseMathAtom();
+                    $result /= $this->parseAtom($targetReference);
                 break;
                 case '.':
-                    $result .= $this->parseMathAtom();
+                    $result .= $this->parseAtom($targetReference);
                 break;
                 case '%':
-                    $result %= $this->parseMathAtom();
+                    $result %= $this->parseAtom($targetReference);
                 break;
                 case '+':
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
+                        if ($targetReference['is_set']) {
+                            $targetReference['ref']++;
+                        }
                         $result++;
                     } else {
                         // Lower lever operator
@@ -679,6 +692,9 @@ class Interpreter
                 case '-':
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
+                        if ($targetReference['is_set']) {
+                            $targetReference['ref']--;
+                        }
                         $result--;
                     } else {
                         // Lower lever operator
@@ -695,12 +711,11 @@ class Interpreter
                     } else {
                         $this->unreadChar();
                         // assign result to target (left side)
-                        if (!count($this->assignmentTarget)) {
+                        if (!$targetReference['is_set']) {
                             throw new Exception('Assignment target is missing');
                         }
-                        $this->assignmentTarget[(count($this->assignmentTarget) - 1)] = $this->evaluateBoolStatement();
-                        $result = $this->assignmentTarget[(count($this->assignmentTarget) - 1)];
-                        array_pop($this->assignmentTarget);
+                        $targetReference['ref'] = $this->evaluateBoolStatement();
+                        $result = $targetReference['ref'];
                     }
                     break;
                 // Lower lever operators
