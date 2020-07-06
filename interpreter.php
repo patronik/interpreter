@@ -922,10 +922,11 @@ class Interpreter
 
     /**
      * Evaluate block or statement and read terminator symbol
+     * @param $stopOnBreak
      *
      * @throws Exception
      */
-    protected function evaluateBlockOrStatement()
+    protected function evaluateBlockOrStatement($stopOnBreak = false)
     {
         if (($char = $this->readChar()) != '{') {
             // evaluate 1 statement
@@ -938,7 +939,11 @@ class Interpreter
             $depth = 0;
             // evaluate 1 code block
             $this->evaluateStatement();
-            while (!$this->return && $statementOp = $this->readChar()) {
+            while (!$this->return
+                && (!$stopOnBreak || !$this->break)
+                && $statementOp = $this->readChar()
+            )
+            {
                 switch ($statementOp) {
                     case '{':
                         $depth++;
@@ -1064,7 +1069,7 @@ class Interpreter
                 if (is_null($blockStartPos)) {
                     $blockStartPos = $this->pos;
                 }
-                $this->evaluateBlockOrStatement();
+                $this->evaluateBlockOrStatement(true);
                 if ($this->break || $this->return) {
                     break;
                 }

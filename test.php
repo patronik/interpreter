@@ -97,6 +97,30 @@ try {
 }
 
 $code = '
+i = 5;
+for (a = 0; a < 5; a = a + 1)
+{
+    if (a > 2) {
+        break;
+    }
+}
+return a + i;
+';
+echo "for loop<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 8) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+
+
+$code = '
 sub add(a,b) {
 return a + b;
 }
