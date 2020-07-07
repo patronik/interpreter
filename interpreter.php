@@ -679,10 +679,16 @@ class Interpreter
                 case '+':
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
-                        if ($targetReference['is_set']) {
-                            $targetReference['ref']++;
+                        if (!$targetReference['is_set']) {
+                            throw new Exception('Assignment target is missing');
                         }
-                        $result++;
+                        $targetReference['ref']++;
+                    } else if ($nextChar == '=') {
+                        if (!$targetReference['is_set']) {
+                            throw new Exception('Assignment target is missing');
+                        }
+                        $targetReference['ref'] = $targetReference['ref'] + $this->evaluateBoolStatement();
+                        $result = $targetReference['ref'];
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
@@ -692,10 +698,16 @@ class Interpreter
                 case '-':
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
-                        if ($targetReference['is_set']) {
-                            $targetReference['ref']--;
+                        if (!$targetReference['is_set']) {
+                            throw new Exception('Assignment target is missing');
                         }
-                        $result--;
+                        $targetReference['ref']--;
+                    } else if ($nextChar == '-') {
+                        if (!$targetReference['is_set']) {
+                            throw new Exception('Assignment target is missing');
+                        }
+                        $targetReference['ref'] = $targetReference['ref'] - $this->evaluateBoolStatement();
+                        $result = $targetReference['ref'];
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
