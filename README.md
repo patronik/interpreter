@@ -24,14 +24,31 @@ require_once 'interpreter.php';
 $inter = new Interpreter();
 try {
     $res = $inter->evaluate(<<<CODE
-if (2 > 1) {
-    if (32 > 11) {
-        result = 2;
-    } else {
-        result = 7;
-    }
+a = 2 + 2;
+if (a > 5) {
+ b = 6;
+} else {
+ b = 9;
 }
-return result;
+sub max(x,y) {
+    if (x > y) {
+        return x;
+    }
+    return y;
+}
+sub min(x,y) {
+    if (x < y) {
+        return x;
+    }
+    return y;
+}
+result = ["max" => max(a,b), "min" => min(a,b)];
+
+data = 0;
+for (i = 0; i < 3; i++) {
+    data = data + result["max"] + result["min"];
+}
+return data;
 CODE
 );
     echo $res . "\n";
@@ -42,7 +59,7 @@ CODE
 
 Output:
 ```
-2
+39
 ```
 
 ## Conclusions
