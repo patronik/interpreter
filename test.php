@@ -98,7 +98,7 @@ try {
 
 $code = '
 i = 5;
-for (a = 0; a < 5; a = a + 1)
+for (a = 0; a < 5; a++)
 {
     if (a > 2) {
         break;
@@ -159,7 +159,12 @@ sub min(x,y) {
     return y;
 }
 result = ["max" => max(a,b), "min" => min(a,b)];
-return result["max"] + result["min"];
+
+data = 0;
+for (i = 0; i < 3; i++) {
+    data = data + result["max"] + result["min"];
+}
+return data;
 ';
 echo "multiple features<br/>";
 echo "code: <b>" . nl2br($code) . "</b>";
@@ -168,7 +173,7 @@ try {
     $inter->setReturnLast(true);
     $res = $inter->evaluate($code);
     echo "res: " . $res . "<br/>";
-    echo ($res == 13) ? 'OK' : 'FAIL!';
+    echo ($res == 39) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
     echo $e->getMessage();
