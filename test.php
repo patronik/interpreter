@@ -162,7 +162,7 @@ result = ["max" => max(a,b), "min" => min(a,b)];
 
 data = 0;
 for (i = 0; i < 3; i++) {
-    data = data + result["max"] + result["min"];
+    data += result["max"] + result["min"];
 }
 return data;
 ';
