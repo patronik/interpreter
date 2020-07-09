@@ -807,13 +807,24 @@ class Interpreter
                         $result = $result < $this->evaluateMathBlock();
                     }
                     break;
+                case 'i': // find in set
+                    $nextChar = $this->readChar(true);
+                    if ($nextChar == 'n') {
+                        $haystack = $this->evaluateMathBlock();
+                        if (!is_array($haystack)) {
+                            throw new Exception('Haystack is not an array.');
+                        }
+                        $result = in_array($result, $haystack);
+                    } else {
+                        throw new Exception('Unexpected token ' . $mathOp . $nextChar . '.');
+                    }
+                break;
                 case 'l': // check against regex
                     $this->evaluateLikeExpression($result);
                 break;
                 // Lower lever operators
                 case '&': // boolean "and" &&
                 case '|': // boolean "or" ||
-                case 'i': // find in set
                 // end of argument or statement
                 case ',':
                 // end of subexpression
