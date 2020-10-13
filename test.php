@@ -38,6 +38,22 @@ try {
 }
 
 $code = '
+2.5 / 2;
+';
+echo "floating point numbers<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = (float) $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 1.25) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+
+$code = '
 a = 15;
 b = 14;
 return a + b * 2;
@@ -82,7 +98,8 @@ if (2 > 1) {
     return 5;
 } else {
     return 4;
-}';
+}
+';
 echo "conditional operator<br/>";
 echo "code: <b>" . nl2br($code) . "</b>";
 try {
