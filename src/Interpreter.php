@@ -1,5 +1,7 @@
 <?php
 
+namespace Vvoina\Zakerzon;
+
 /**
  * Class Interpreter
  * @author Vasyl Voina <vasyl.voina@gmail.com>

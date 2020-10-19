@@ -1,9 +1,11 @@
 <?php
 
+require __DIR__.'/../vendor/autoload.php';
+
+use Vvoina\Zakerzon\Interpreter;
+
 ini_set('display_errors', 1);
 error_reporting(E_ALL);
-
-require_once 'interpreter.php';
 
 $code = '
 2 + 2;
