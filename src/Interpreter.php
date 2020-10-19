@@ -258,7 +258,7 @@ class Interpreter
         if ($char == '(') {
             $atom = $this->evaluateBoolStatement();
             if ($this->readChar() != ')') {
-                throw new Exception('Syntax error. Wrong number of parentheses.');
+                throw new \Exception('Syntax error. Wrong number of parentheses.');
             }
             return true;
         }
@@ -281,16 +281,16 @@ class Interpreter
         $array = [];
         $implicitKey = 0;
         do {
-            $keyOrVal = $this->evaluateMathBlock();
+            $keyOrVal = $this->evaluateBoolExpression();
             $nextChar = $this->readChar();
             if (in_array($nextChar, [',',']'])) {
                 $array[$implicitKey++] = $keyOrVal;
             } else if ($nextChar == '=') {
                 $nextChar = $this->readChar();
                 if ($nextChar == '>') {
-                    $arrayVal = $this->evaluateMathBlock();
+                    $arrayVal = $this->evaluateBoolExpression();
                     if (!is_numeric($keyOrVal) && !is_string($keyOrVal)) {
-                        throw new Exception('Only string and integer array keys are supported.');
+                        throw new \Exception('Only string and integer array keys are supported.');
                     }
                     if (is_numeric($keyOrVal) && $keyOrVal >= $implicitKey) {
                         $implicitKey = $keyOrVal + 1;
@@ -298,13 +298,13 @@ class Interpreter
                     $array[$keyOrVal] = $arrayVal;
                     $nextChar = $this->readChar();
                 } else {
-                    throw new Exception('Unexpected token "' . $nextChar . '".');
+                    throw new \Exception('Unexpected token "' . $nextChar . '".');
                 }
             }
         } while ($nextChar == ',');
 
         if ($nextChar != ']') {
-            throw new Exception('Unexpected token "' . $nextChar . '".');
+            throw new \Exception('Unexpected token "' . $nextChar . '".');
         }
 
         $atom = $array;
@@ -350,7 +350,7 @@ class Interpreter
         }
 
         if ($char != ')') {
-            throw new Exception('Unexpected token "' . $char . '".');
+            throw new \Exception('Unexpected token "' . $char . '".');
         }
 
         $this->stack[] = $functionStack;
@@ -399,23 +399,23 @@ class Interpreter
 
         $elementKeys = [];
         do {
-            $key = $this->parseAtom();
+            $key = $this->evaluateBoolExpression();
 
             if (is_null($key)) {
-                throw new Exception('Failed to parse array key.');
+                throw new \Exception('Failed to parse array key.');
             }
             if (!is_numeric($key) && !is_string($key)) {
-                throw new Exception('Only string and integer array keys are supported.');
+                throw new \Exception('Only string and integer array keys are supported.');
             }
 
             $elementKeys[] = $key;
 
             $char = $this->readChar();
             if (is_null($char)) {
-                throw new Exception('Unexpected end of file.');
+                throw new \Exception('Unexpected end of file.');
             }
             if ($char != ']') {
-                throw new Exception('Unexpected token "' . $char . '".');
+                throw new \Exception('Unexpected token "' . $char . '".');
             }
 
             $char = $this->readChar();
@@ -557,7 +557,7 @@ class Interpreter
                     continue;
                 } else if ($asciiCode == 46) { // .
                     if ($hasDot) {
-                        throw new Exception('Unexpected token "' . $char . '".');
+                        throw new \Exception('Unexpected token "' . $char . '".');
                     }
                     $hasDot = true;
                     $atom .= $char;
@@ -569,7 +569,7 @@ class Interpreter
                 break;
             }
             if ($asciiCode == 46) { // . at the end of number
-                throw new Exception('Unexpected token "' . $char . '".');
+                throw new \Exception('Unexpected token "' . $char . '".');
             }
             return true;
         }
@@ -587,10 +587,10 @@ class Interpreter
         foreach (['i', 'k', 'e'] as $char) {
             $nextChar = $this->readChar(true);
             if ($nextChar != $char) {
-                throw new Exception('Unexpected token "' . $nextChar . '".');
+                throw new \Exception('Unexpected token "' . $nextChar . '".');
             }
         }
-        $result = preg_match('#' . $this->evaluateMathBlock() . '#', $result);
+        $result = preg_match('#' . $this->evaluateBoolExpression() . '#', $result);
     }
 
     /**
@@ -693,12 +693,12 @@ class Interpreter
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
                         if (!$targetReference['is_set']) {
-                            throw new Exception('Assignment target is missing');
+                            throw new \Exception('Assignment target is missing');
                         }
                         $targetReference['ref']++;
                     } else if ($nextChar == '=') {
                         if (!$targetReference['is_set']) {
-                            throw new Exception('Assignment target is missing');
+                            throw new \Exception('Assignment target is missing');
                         }
                         $targetReference['ref'] = $targetReference['ref'] + $this->evaluateBoolStatement();
                         $result = $targetReference['ref'];
@@ -712,12 +712,12 @@ class Interpreter
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
                         if (!$targetReference['is_set']) {
-                            throw new Exception('Assignment target is missing');
+                            throw new \Exception('Assignment target is missing');
                         }
                         $targetReference['ref']--;
-                    } else if ($nextChar == '-') {
+                    } else if ($nextChar == '=') {
                         if (!$targetReference['is_set']) {
-                            throw new Exception('Assignment target is missing');
+                            throw new \Exception('Assignment target is missing');
                         }
                         $targetReference['ref'] = $targetReference['ref'] - $this->evaluateBoolStatement();
                         $result = $targetReference['ref'];
@@ -741,7 +741,7 @@ class Interpreter
                         $this->unreadChar();
                         // assign result to target (left side)
                         if (!$targetReference['is_set']) {
-                            throw new Exception('Assignment target is missing');
+                            throw new \Exception('Assignment target is missing');
                         }
                         $targetReference['ref'] = $this->evaluateBoolStatement();
                         $result = $targetReference['ref'];
@@ -768,7 +768,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected token "' . $atomOp . '".');
+                    throw new \Exception('Unexpected token "' . $atomOp . '".');
                     break;
             }
         }
@@ -796,8 +796,12 @@ class Interpreter
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
                         $result = $result == $this->evaluateMathBlock();
+                    } elseif ($nextChar == '>')  {
+                        $this->unreadChar(2);
+                        return $result;
+                        break;
                     } else {
-                        throw new Exception('Unexpected token "' . $mathOp . $nextChar . '".');
+                        throw new \Exception('Unexpected token "' . $mathOp . $nextChar . '".');
                     }
                 break;
                 case '!':
@@ -805,7 +809,7 @@ class Interpreter
                     if ($nextChar == '=') {
                         $result = $result != $this->evaluateMathBlock();
                     } else {
-                        throw new Exception('Unexpected token "' . $mathOp . $nextChar . '".');
+                        throw new \Exception('Unexpected token "' . $mathOp . $nextChar . '".');
                     }
                 break;
                 case '>':
@@ -831,11 +835,11 @@ class Interpreter
                     if ($nextChar == 'n') {
                         $haystack = $this->evaluateMathBlock();
                         if (!is_array($haystack)) {
-                            throw new Exception('Haystack is not an array.');
+                            throw new \Exception('Haystack is not an array.');
                         }
                         $result = in_array($result, $haystack);
                     } else {
-                        throw new Exception('Unexpected token "' . $mathOp . $nextChar . '".');
+                        throw new \Exception('Unexpected token "' . $mathOp . $nextChar . '".');
                     }
                 break;
                 case 'l': // check against regex
@@ -849,14 +853,15 @@ class Interpreter
                 // end of subexpression
                 case ')':
                 // end of statement
-                case ';':
-                    // start of statement block
+                case ';':                
+                // array value parsed
+                case ']':
                     $this->unreadChar();
                     // return result from recursive call
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected token "' . $mathOp . '".');
+                    throw new \Exception('Unexpected token "' . $mathOp . '".');
                     break;
             }
         }
@@ -890,7 +895,7 @@ class Interpreter
                         }
                         $result = (bool) ($result || $this->evaluateBoolExpression());
                     } else {
-                        throw new Exception('Unexpected token "' . $booleanOp . $nextChar . '".');
+                        throw new \Exception('Unexpected token "' . $booleanOp . $nextChar . '".');
                     }
                     break;
                 case '&':
@@ -905,7 +910,7 @@ class Interpreter
                         }
                         $result = (bool) ($result && $this->evaluateBoolExpression());
                     } else {
-                        throw new Exception('Unexpected token "' . $booleanOp . $nextChar . '".');
+                        throw new \Exception('Unexpected token "' . $booleanOp . $nextChar . '".');
                     }
                     break;
                 // end of argument
@@ -919,7 +924,7 @@ class Interpreter
                     return $result;
                     break;
                 default:
-                    throw new Exception('Unexpected token "' . $booleanOp . '".');
+                    throw new \Exception('Unexpected token "' . $booleanOp . '".');
                     break;
             }
         }
@@ -990,7 +995,7 @@ class Interpreter
             $this->unreadChar();
             $this->evaluateStatement();
             if (($char = $this->readChar()) != ';') {
-                throw new Exception('Unexpected token "' . $char . '".');
+                throw new \Exception('Unexpected token "' . $char . '".');
             }
         } else {
             $depth = 0;
@@ -1016,7 +1021,7 @@ class Interpreter
                         $this->evaluateStatement();
                         break;
                     default:
-                        throw new Exception('Unexpected token "' . $statementOp . '".');
+                        throw new \Exception('Unexpected token "' . $statementOp . '".');
                     break;
                 }
             }
@@ -1053,15 +1058,15 @@ class Interpreter
         $char = $this->readChar();
         $functionName = null;
         if (!$this->parseCharacterSequence($char, $functionName)) {
-            throw new Exception('Failed to parse function name.');
+            throw new \Exception('Failed to parse function name.');
         }
 
         if (isset($this->functions[$functionName])) {
-            throw new Exception('Function ' . $functionName . ' already exists.');
+            throw new \Exception('Function ' . $functionName . ' already exists.');
         }
 
         if (($char = $this->readChar()) != '(') {
-            throw new Exception('Unexpected token "' . $char . '".');
+            throw new \Exception('Unexpected token "' . $char . '".');
         }
 
         $parameters = [];
@@ -1075,13 +1080,13 @@ class Interpreter
             if ($this->parseCharacterSequence($char, $argName)) {
                 $parameters[] = $argName;
             } else {
-                throw new Exception('Unexpected token "' . $char . '".');
+                throw new \Exception('Unexpected token "' . $char . '".');
             }
             $char = $this->readChar();
         } while ($char == ',');
 
         if ($char != ')') {
-            throw new Exception('Unexpected token "' . $char . '".');
+            throw new \Exception('Unexpected token "' . $char . '".');
         }
 
         $this->functions[$functionName] = [
@@ -1098,7 +1103,7 @@ class Interpreter
     protected function evaluateForLoop()
     {
         if (($char = $this->readChar()) != '(') {
-            throw new Exception('Unexpected token "' . $char . '".');
+            throw new \Exception('Unexpected token "' . $char . '".');
         }
         /**
          * Initializer statement
@@ -1106,7 +1111,7 @@ class Interpreter
         $this->evaluateStatement();
 
         if (($char = $this->readChar()) != ';') {
-            throw new Exception('Unexpected token "' . $char . '".');
+            throw new \Exception('Unexpected token "' . $char . '".');
         }
 
         $blockStartPos = null;
@@ -1116,7 +1121,7 @@ class Interpreter
         do {
             $this->evaluateStatement();
             if (($char = $this->readChar()) != ';') {
-                throw new Exception('Unexpected token "' . $char . '".');
+                throw new \Exception('Unexpected token "' . $char . '".');
             }
             if ($this->lastResult) {
                 if (is_null($afterStatementPos)) {
@@ -1158,7 +1163,7 @@ class Interpreter
     {
         $lastIfResult = null;
         if (($char = $this->readChar()) != '(') {
-            throw new Exception('Unexpected token "' . $char . '".');
+            throw new \Exception('Unexpected token "' . $char . '".');
         }
         $this->evaluateSubexpression($char, $lastIfResult);
 
@@ -1182,22 +1187,22 @@ class Interpreter
             foreach (['l', 's', 'e'] as $char) {
                 $nextChar = $this->readChar(true);
                 if ($nextChar != $char) {
-                    throw new Exception('Unexpected token "' . $nextChar . '".');
+                    throw new \Exception('Unexpected token "' . $nextChar . '".');
                 }
             }
             if (($char = $this->readChar(true)) == 'i') {
                 if ($nextChar = $this->readChar(true) != 'f') {
-                    throw new Exception('Unexpected token "' . $nextChar . '".');
+                    throw new \Exception('Unexpected token "' . $nextChar . '".');
                 }
                 if ($lastIfResult) {
                     if (($char = $this->readChar()) != '(') {
-                        throw new Exception('Unexpected token "' . $char . '".');
+                        throw new \Exception('Unexpected token "' . $char . '".');
                     }
                     $this->rewindUntil([')'], '(');
                     $this->skipBlockOrStatement();
                 } else {
                     if (($char = $this->readChar()) != '(') {
-                        throw new Exception('Unexpected token "' . $char . '".');
+                        throw new \Exception('Unexpected token "' . $char . '".');
                     }
                     $this->evaluateSubexpression($char, $lastIfResult);
                     if ($lastIfResult) {
@@ -1210,7 +1215,7 @@ class Interpreter
             } else {
                 $this->unreadChar();
                 if ($elseFound) {
-                    throw new Exception('Only 1 else statement can be used after if.');
+                    throw new \Exception('Only 1 else statement can be used after if.');
                 }
                 $elseFound = true;
                 if ($lastIfResult) {
@@ -1320,7 +1325,7 @@ class Interpreter
                     $this->evaluateStatement();
                     break;
                 default:
-                    throw new Exception('Unexpected token "' . $statementOp . '".');
+                    throw new \Exception('Unexpected token "' . $statementOp . '".');
                     break;
             }
         }
@@ -1351,7 +1356,7 @@ class Interpreter
                     $this->evaluateStatements();
                     break;
                 default:
-                    throw new Exception('Unexpected token "' . $separator . '".');
+                    throw new \Exception('Unexpected token "' . $separator . '".');
                 break;
             }
         }
