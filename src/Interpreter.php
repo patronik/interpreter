@@ -180,33 +180,33 @@ class Interpreter
      *
      * @param $operator
      * @param $val
-     * @param $targetReference
+     * @param $varRef
      * @return int
      */
-    protected function applyPreOperator($operator, $val, array &$targetReference = [])
+    protected function applyPreOperator($operator, $val, array &$varRef = [])
     {
         switch ($operator) {
             case '-' :
-                if ($targetReference['is_set']) {
-                    $targetReference['ref'] = -$targetReference;
+                if ($varRef['is_set']) {
+                    $varRef['ref'] = -$varRef;
                 }
                 return -$val;
                 break;
             case '+' :
-                if ($targetReference['is_set']) {
-                    $targetReference['ref'] = +$targetReference;
+                if ($varRef['is_set']) {
+                    $varRef['ref'] = +$varRef;
                 }
                 return +$val;
                 break;
             case '++' :
-                if ($targetReference['is_set']) {
-                    ++$targetReference['ref'];
+                if ($varRef['is_set']) {
+                    ++$varRef['ref'];
                 }
                 return ++$val;
                 break;
             case '--' :
-                if ($targetReference['is_set']) {
-                    --$targetReference['ref'];
+                if ($varRef['is_set']) {
+                    --$varRef['ref'];
                 }
                 return --$val;
                 break;
@@ -384,11 +384,11 @@ class Interpreter
     /**
      * @param $varName
      * @param $atom
-     * @param array $targetReference
+     * @param array $varRef
      * @return bool
      * @throws Exception
      */
-    protected function parseArrayElementAtom($varName, &$atom, array &$targetReference = [])
+    protected function parseArrayElementAtom($varName, &$atom, array &$varRef = [])
     {
         // array element
         $char = $this->readChar();
@@ -438,8 +438,8 @@ class Interpreter
             $target =& $target[$elementKey];
         }
 
-        $targetReference['is_set'] = true;
-        $targetReference['ref'] =& $target;
+        $varRef['is_set'] = true;
+        $varRef['ref'] =& $target;
 
         $atom = $target;
         return true;
@@ -448,11 +448,11 @@ class Interpreter
     /**
      * @param $char
      * @param $atom
-     * @param array $targetReference
+     * @param array $varRef
      * @return bool
      * @throws Exception
      */
-    protected function parseVariableAtom($char, &$atom, array &$targetReference = [])
+    protected function parseVariableAtom($char, &$atom, array &$varRef = [])
     {
         // variable
         $varName = null;
@@ -463,7 +463,7 @@ class Interpreter
             }
 
             // try to parse array element
-            if ($this->parseArrayElementAtom($varName, $atom, $targetReference)) {
+            if ($this->parseArrayElementAtom($varName, $atom, $varRef)) {
                 return true;
             }
 
@@ -474,8 +474,8 @@ class Interpreter
             }
             $target =& $storage[$varName];
 
-            $targetReference['is_set'] = true;
-            $targetReference['ref'] =& $target;
+            $varRef['is_set'] = true;
+            $varRef['ref'] =& $target;
 
             $atom = $target;
             return true;
@@ -596,11 +596,11 @@ class Interpreter
     /**
      * The atomic (non dividable) part of expression
      *
-     * @param array $targetReference
+     * @param array $varRef
      * @return bool|int|mixed|string|null
      * @throws Exception
      */
-    protected function parseAtom(array &$targetReference = [])
+    protected function parseAtom(array &$varRef = [])
     {
         $atom = null;
         $boolInversion = false;
@@ -645,18 +645,14 @@ class Interpreter
             return $atom;
         }
 
-        if (!$this->parseVariableAtom($atomChar, $atom, $targetReference)) {
-            if (!$this->parseArrayAtom($atomChar, $atom)) {
-                if (!$this->parseNumberAtom($atomChar, $atom)) {
-                    if (!$this->parseSingleQuotedStringAtom($atomChar, $atom)) {
-                        $this->parseDoubleQuotedStringAtom($atomChar, $atom);
-                    }
-                }
-            }
-        }
+        $this->parseVariableAtom($atomChar, $atom, $varRef)
+        || $this->parseArrayAtom($atomChar, $atom)
+        || $this->parseNumberAtom($atomChar, $atom)
+        || $this->parseSingleQuotedStringAtom($atomChar, $atom)
+        || $this->parseDoubleQuotedStringAtom($atomChar, $atom);
 
         if ($preOperator) {
-            $atom = $this->applyPreOperator($preOperator, $atom, $targetReference);
+            $atom = $this->applyPreOperator($preOperator, $atom, $varRef);
         }
 
         if ($boolInversion) {
@@ -673,35 +669,35 @@ class Interpreter
      */
     protected function evaluateMathBlock()
     {
-        $targetReference = ['is_set' => false, 'ref' => null];
-        $result = $this->parseAtom($targetReference);
+        $varRef = ['is_set' => false, 'ref' => null];
+        $result = $this->parseAtom($varRef);
         while ($atomOp = $this->readChar(true)) {
             switch ($atomOp) {
                 case '*':
-                    $result *= $this->parseAtom($targetReference);
+                    $result *= $this->parseAtom($varRef);
                 break;
                 case '/':
-                    $result /= $this->parseAtom($targetReference);
+                    $result /= $this->parseAtom($varRef);
                 break;
                 case '.':
-                    $result .= $this->parseAtom($targetReference);
+                    $result .= $this->parseAtom($varRef);
                 break;
                 case '%':
-                    $result %= $this->parseAtom($targetReference);
+                    $result %= $this->parseAtom($varRef);
                 break;
                 case '+':
                     $nextChar = $this->readChar();
                     if ($nextChar == '+') {
-                        if (!$targetReference['is_set']) {
+                        if (!$varRef['is_set']) {
                             throw new \Exception('Assignment target is missing');
                         }
-                        $targetReference['ref']++;
+                        $varRef['ref']++;
                     } else if ($nextChar == '=') {
-                        if (!$targetReference['is_set']) {
+                        if (!$varRef['is_set']) {
                             throw new \Exception('Assignment target is missing');
                         }
-                        $targetReference['ref'] = $targetReference['ref'] + $this->evaluateBoolStatement();
-                        $result = $targetReference['ref'];
+                        $varRef['ref'] = $varRef['ref'] + $this->evaluateBoolStatement();
+                        $result = $varRef['ref'];
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
@@ -711,16 +707,16 @@ class Interpreter
                 case '-':
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
-                        if (!$targetReference['is_set']) {
+                        if (!$varRef['is_set']) {
                             throw new \Exception('Assignment target is missing');
                         }
-                        $targetReference['ref']--;
+                        $varRef['ref']--;
                     } else if ($nextChar == '=') {
-                        if (!$targetReference['is_set']) {
+                        if (!$varRef['is_set']) {
                             throw new \Exception('Assignment target is missing');
                         }
-                        $targetReference['ref'] = $targetReference['ref'] - $this->evaluateBoolStatement();
-                        $result = $targetReference['ref'];
+                        $varRef['ref'] = $varRef['ref'] - $this->evaluateBoolStatement();
+                        $result = $varRef['ref'];
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
@@ -740,11 +736,11 @@ class Interpreter
                     } else {
                         $this->unreadChar();
                         // assign result to target (left side)
-                        if (!$targetReference['is_set']) {
+                        if (!$varRef['is_set']) {
                             throw new \Exception('Assignment target is missing');
                         }
-                        $targetReference['ref'] = $this->evaluateBoolStatement();
-                        $result = $targetReference['ref'];
+                        $varRef['ref'] = $this->evaluateBoolStatement();
+                        $result = $varRef['ref'];
                     }
                     break;
                 // Lower lever operators

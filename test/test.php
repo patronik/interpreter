@@ -159,6 +159,22 @@ try {
 }
 
 $code = '
+return "abc" like ".*c.*";
+';
+echo "regular expression<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 1) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+
+$code = '
 a = 2 + 2;
 if (a > 5) {
  b = 6;
@@ -197,5 +213,3 @@ try {
 } catch (Exception $e) {
     echo $e->getMessage();
 }
-
-
