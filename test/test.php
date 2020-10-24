@@ -24,6 +24,24 @@ try {
 }
 
 $code = '
+if (false || 1) {
+    a = 2;
+}
+';
+echo "keyword atom<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 2) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+
+$code = '
 2 - 1;
 ';
 echo "subtraction<br/>";
@@ -34,6 +52,22 @@ try {
     $res = $inter->evaluate($code);
     echo "res: " . $res . "<br/>";
     echo ($res == 1) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage();
+}
+
+$code = '
+(2 + 2 * 5) + 1;
+';
+echo "subexpression<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 13) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
     echo $e->getMessage();
