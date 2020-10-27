@@ -11,7 +11,7 @@ use Vvoina\Zakerzon\Atom;
 class Jnull extends Joiner
 {
     protected $operators = [
-        '=='
+        '==', '='
     ];
 
     public function join($operator, Atom $left, Atom $right)
@@ -21,6 +21,9 @@ class Jnull extends Joiner
         switch ($operator) {
             case '==' :
                 $left->setBool(true);
+            break;
+            case '=' :
+                // do nothing
             break;
         }
     }

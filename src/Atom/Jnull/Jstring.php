@@ -11,7 +11,7 @@ use Vvoina\Zakerzon\Atom;
 class Jstring extends Joiner
 {
     protected $operators = [
-        '.'
+        '.', '='
     ];
 
     public function join($operator, Atom $left, Atom $right)
@@ -21,7 +21,10 @@ class Jstring extends Joiner
         switch ($operator) {
             case '.' :
                 $left->setString($right->getString());
-            break;            
+            break;  
+            case '=' :
+                $left->setString($right->getString());
+            break;          
         }
     }
 }

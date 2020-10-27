@@ -424,6 +424,30 @@ class Atom
       return $this->noolVal;
     }    
 
+    public function toString()
+    {
+      switch ($this->type) {
+        case self::TYPE_INT :
+          return (string) $this->intVal;
+        break;
+        case self::TYPE_DOUBLE :
+          return (string) $this->doubleVal;
+        break;
+        case self::TYPE_STRING :
+          return (string) $this->stringVal;
+        break;
+        case self::TYPE_ARRAY :
+          throw new \Exception('Array to string conversion');
+        break;
+        case self::TYPE_BOOL :
+          return (string) $this->boolVal;
+        break;
+        case self::TYPE_NOOL :
+          return (string) $this->noolVal;
+        break;
+    }
+    }
+
     public function preOperator($operator)
     {
         switch ($operator) {

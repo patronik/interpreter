@@ -11,7 +11,7 @@ use Vvoina\Zakerzon\Atom;
 class Jdouble extends Joiner
 {
     protected $operators = [
-        '='
+        '=', '||'
     ];
 
     public function join($operator, Atom $left, Atom $right)
@@ -19,6 +19,11 @@ class Jdouble extends Joiner
         $this->validate($operator, $right->getType());
 
         switch ($operator) {
+            case '||' :
+                $left->setBool(
+                    $left->getBool() || ((bool)$right->getDouble())
+                );
+            break;
             case '=' :
                 $left->setBool((bool)$right->getDouble());
             break;

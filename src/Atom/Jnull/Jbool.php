@@ -10,10 +10,18 @@ use Vvoina\Zakerzon\Atom;
  */
 class Jbool extends Joiner
 {
-    protected $operators = [];
+    protected $operators = [
+        '=',
+    ];
 
     public function join($operator, Atom $left, Atom $right)
     {
         $this->validate($operator, $right->getType());
+
+        switch ($operator) {
+            case '=' :
+                $left->setBool($right->getBool());
+            break;
+        }
     }
 }
