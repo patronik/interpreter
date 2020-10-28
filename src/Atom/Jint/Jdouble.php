@@ -11,7 +11,7 @@ use Vvoina\Zakerzon\Atom;
 class Jdouble extends Joiner
 {
     protected $operators = [
-        '+', '-', '*', '/', '%', '==', '>=', '<=', '||', '&&', '='
+        '+', '-', '*', '/', '%', '==', '>', '<', '>=', '<=', '||', '&&', '='
     ];
 
     public function join($operator, Atom $left, Atom $right)
@@ -57,6 +57,16 @@ class Jdouble extends Joiner
                     (bool) ($left->getInt() >= $right->getDouble())
                 );
             break;
+            case '>' :
+                $left->setBool(
+                    (bool) ($left->getInt() > $right->getDouble())
+                );
+            break;
+            case '<' :
+                $left->setBool(
+                    (bool) ($left->getInt() < $right->getDouble())
+                );
+            break;
             case '<=' :
                 $left->setBool(
                     (bool) ($left->getInt() <= $right->getDouble())
@@ -73,6 +83,10 @@ class Jdouble extends Joiner
                 );
             break;
             case '=' :
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setInt((int)$right->getDouble());
                 $left->setInt((int)$right->getDouble());
             break;
         }

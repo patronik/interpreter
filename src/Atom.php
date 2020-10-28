@@ -24,6 +24,8 @@ class Atom
     protected $boolVal;
     protected $noolVal;
 
+    protected $varRef;
+
     public function __construct($type = null, $val = null)
     {
       if ($type && $val) {
@@ -60,6 +62,21 @@ class Atom
         $this->type = self::TYPE_NOOL;
         $this->noolVal = null;
       }
+    }
+
+    public function setVarRef(Atom $atom)
+    {
+      $this->varRef = $atom;
+    }
+
+    public function getVarRef()
+    {
+      return $this->varRef;
+    }
+
+    public function isVar()
+    {
+      return $this->varRef !== null;
     }
 
     protected static $joiners = array (
@@ -284,8 +301,8 @@ class Atom
             case self::TYPE_NOOL :
               $this->noolVal = null;
             break;
-        }
-    }
+        }        
+    }    
 
     /**
      * @return Joiner
@@ -324,41 +341,41 @@ class Atom
     {
         $this->clearVal();
         $this->intVal = $val;
-        $this->type = self::TYPE_INT;
+        $this->type = self::TYPE_INT;        
     }
 
     public function setDouble($val) {
         $this->clearVal();
         $this->doubleVal = $val;
-        $this->type = self::TYPE_DOUBLE;
+        $this->type = self::TYPE_DOUBLE;        
     }
 
     public function setString($val) 
     {
         $this->clearVal();
         $this->stringVal = $val;
-        $this->type = self::TYPE_STRING;
+        $this->type = self::TYPE_STRING;        
     }
 
     public function setArray($val) 
     {
         $this->clearVal();
         $this->arrayVal = $val;
-        $this->type = self::TYPE_ARRAY;
+        $this->type = self::TYPE_ARRAY;        
     }
 
     public function setBool($val) 
     {
         $this->clearVal();
         $this->boolVal = $val;
-        $this->type = self::TYPE_BOOL;
+        $this->type = self::TYPE_BOOL;        
     }
 
     public function setNool($val) 
     {
         $this->clearVal();
         $this->boolVal = $val;
-        $this->type = self::TYPE_NOOL;
+        $this->type = self::TYPE_NOOL;        
     }
 
     /**
@@ -424,6 +441,33 @@ class Atom
       return $this->noolVal;
     }    
 
+    public function issetAt($key)
+    {
+      if ($this->type != self::TYPE_ARRAY) {
+        throw new \Exception('Method is not supported by non array atom');
+      }
+      return isset($this->arrayVal[$key]);
+    }
+
+    public function elementAt($key)
+    {
+      if ($this->type != self::TYPE_ARRAY) {
+        throw new \Exception('Method is not supported by non array atom');
+      }
+      if (!isset($this->arrayVal[$key])) {
+        throw new \Exception('Element with key "' . $key . '" does not exist');
+      }
+      return $this->arrayVal[$key];
+    }
+
+    public function createAt($key, Atom $val)
+    {
+      if ($this->type != self::TYPE_ARRAY) {
+        throw new \Exception('Method is not supported by non array atom');
+      }
+      return $this->arrayVal[$key] = $val;
+    }
+
     public function toString()
     {
       switch ($this->type) {
@@ -450,7 +494,10 @@ class Atom
 
     public function preOperator($operator)
     {
-        switch ($operator) {
+      if ($this->isVar()) {
+        $this->getVarRef()->preOperator($operator);
+      }  
+      switch ($operator) {
           case '++':
             switch ($this->type) {
               case self::TYPE_INT:
@@ -503,8 +550,11 @@ class Atom
     }
 
     public function postOperator($operator)
-    {
-        switch ($operator) {
+    {      
+      if ($this->isVar()) {
+        $this->getVarRef()->postOperator($operator);
+      }
+      switch ($operator) {
           case '++':
             switch ($this->type) {
               case self::TYPE_INT:
@@ -539,6 +589,9 @@ class Atom
 
     public function unaryOperator($operator)
     {
+      if ($this->isVar()) {
+        $this->getVarRef()->unaryOperator($operator);
+      }
       switch ($operator) {
         case '-':
           switch ($this->type) {

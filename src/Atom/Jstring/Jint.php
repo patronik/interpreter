@@ -25,6 +25,10 @@ class Jint extends Joiner
                 );
             break;
             case '=' :
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setString((string)$right->getInt());
                 $left->setString((string)$right->getInt());
             break;             
         }

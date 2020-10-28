@@ -20,7 +20,11 @@ class Jdouble extends Joiner
 
         switch ($operator) {
             case '=' :
-                $left->setDouble($right->getDouble());
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setDouble($right->getDouble());
+                $left->setDouble($right->getDouble()); 
             break;
         }
     }

@@ -419,17 +419,18 @@ class Interpreter
         if (!isset($storage[$varName])) {
             $storage[$varName] = new Atom('array', []);
         }
-        $target =& $storage[$varName];
+        $target = $storage[$varName];
         foreach ($elementKeys as $key => $elementKeyAtom) {
-            if ($key < (count($elementKeys) - 1)) {
-                if (!isset($target[$elementKeyAtom->toString()])) {
-                    $target[$elementKeyAtom->toString()] = [];
+            if ($key < (count($elementKeys) - 1)) {                
+                if (!$target->issetAt($elementKeyAtom->toString())) {
+                    $target->createAt($elementKeyAtom->toString(), new Atom('array', []));
                 }
             }
-            $target =& $target[$elementKeyAtom->toString()];
+            $target = $target->elementAt($elementKeyAtom->toString());
         }
 
-        $atom = $target;
+        $atom = clone $target;
+        $atom->setVarRef($target);
         return true;
     }
 
@@ -464,9 +465,8 @@ class Interpreter
             if (!isset($storage[$varName])) {
                 $storage[$varName] = new Atom();
             }
-            $target =& $storage[$varName];
-
-            $atom = $target;
+            $atom = clone $storage[$varName]; 
+            $atom->setVarRef($storage[$varName]);
             return true;
         }
         return false;
@@ -1098,7 +1098,7 @@ class Interpreter
             if (($char = $this->readChar()) != ';') {
                 throw new \Exception('Unexpected token "' . $char . '".');
             }
-            if ($this->lastResult) {
+            if ($this->lastResult->toString()) {
                 if (is_null($afterStatementPos)) {
                     $afterStatementPos = $this->pos;
                 }

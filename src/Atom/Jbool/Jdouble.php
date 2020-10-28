@@ -24,7 +24,11 @@ class Jdouble extends Joiner
                     $left->getBool() || ((bool)$right->getDouble())
                 );
             break;
-            case '=' :
+            case '=' :  
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setBool((bool)$right->getDouble());
                 $left->setBool((bool)$right->getDouble());
             break;
         }

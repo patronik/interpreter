@@ -20,7 +20,11 @@ class Jbool extends Joiner
 
         switch ($operator) {
             case '=' :
-                $left->setBool($right->getBool());
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setBool($right->getBool());
+                $left->setBool($right->getBool()); 
             break;
         }
     }

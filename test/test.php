@@ -20,7 +20,7 @@ try {
     echo ($res == 4) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -38,7 +38,7 @@ try {
     echo ($res == 2) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -54,7 +54,7 @@ try {
     echo ($res == 1) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -70,7 +70,7 @@ try {
     echo ($res == 13) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -86,7 +86,7 @@ try {
     echo ($res == 1.25) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -104,7 +104,7 @@ try {
     echo ($res == 43) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -124,7 +124,7 @@ try {
     echo ($res == 1) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 
@@ -146,7 +146,7 @@ try {
     echo ($res == 5) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -169,7 +169,7 @@ try {
     echo ($res == 8) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 
@@ -189,7 +189,7 @@ try {
     echo ($res == 10) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -205,7 +205,7 @@ try {
     echo ($res == 1) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -245,5 +245,5 @@ try {
     echo ($res == 39) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }

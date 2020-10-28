@@ -20,6 +20,10 @@ class Jnull extends Joiner
 
         switch ($operator) {            
             case '=' :
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setNool($right->getNool());
                 $left->setNool($right->getNool());
             break;
         }

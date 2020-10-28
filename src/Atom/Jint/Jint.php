@@ -11,7 +11,7 @@ use Vvoina\Zakerzon\Atom;
 class Jint extends Joiner
 {
     protected $operators = [
-        '+', '-', '*', '/', '%', '==', '>=', '<=', '||', '&&', '='
+        '+', '-', '*', '/', '%', '==', '>', '<', '>=', '<=', '||', '&&', '='
     ];
 
     public function join($operator, Atom $left, Atom $right)
@@ -57,6 +57,16 @@ class Jint extends Joiner
                     (bool) ($left->getInt() >= $right->getInt())
                 );
             break;
+            case '>' :
+                $left->setBool(
+                    (bool) ($left->getInt() > $right->getInt())
+                );
+            break;
+            case '<' :
+                $left->setBool(
+                    (bool) ($left->getInt() < $right->getInt())
+                );
+            break;
             case '<=' :
                 $left->setBool(
                     (bool) ($left->getInt() <= $right->getInt())
@@ -73,6 +83,10 @@ class Jint extends Joiner
                 );
             break;
             case '=' :
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setInt($right->getInt());
                 $left->setInt($right->getInt());
             break;
         }

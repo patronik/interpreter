@@ -20,7 +20,11 @@ class Jstring extends Joiner
 
         switch ($operator) {
             case '=' :
-                $left->setBool((bool)$right->getString());
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setBool((bool)$right->getString());
+                $left->setBool((bool)$right->getString()); 
             break;
         }
     }

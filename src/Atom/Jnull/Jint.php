@@ -20,6 +20,10 @@ class Jint extends Joiner
 
         switch ($operator) {
             case '=' :
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setInt($right->getInt());
                 $left->setInt($right->getInt());
             break;
         }

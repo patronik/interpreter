@@ -23,7 +23,11 @@ class Jnull extends Joiner
                 $left->setBool(true);
             break;
             case '=' :
-                // do nothing
+                if (!$left->isVar()) {
+                    throw new \Exception('Assignment can only be done to variable');                    
+                } 
+                $left->getVarRef()->setNool($right->getNool());
+                $left->setNool($right->getNool()); 
             break;
         }
     }
