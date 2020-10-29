@@ -127,7 +127,21 @@ try {
     echo $e->getMessage() . "<br/>";
 }
 
-
+$code = '
+2 in [1,2];
+';
+echo "in array<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 1) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage() . "<br/>";
+}
 
 $code = '
 if (2 > 1) {

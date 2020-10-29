@@ -10,10 +10,27 @@ use Vvoina\Zakerzon\Atom;
  */
 class Jarray extends Joiner
 {
-    protected $operators = [];
+    protected $operators = [
+        'in'
+    ];
 
     public function join($operator, Atom $left, Atom $right)
     {
         $this->validate($operator, $right->getType());
+
+        switch ($operator) {
+            case 'in' :
+                $found = false;
+                foreach ($right->getArray() as $atomElement) {
+                    if ($atomElement->getType() == Atom::TYPE_STRING) {
+                        if ($atomElement->getString() == $left->getString()) {
+                            $found = true;
+                            break;
+                        }
+                   }
+                }
+                $left->setBool($found);
+            break;           
+        }
     }
 }
