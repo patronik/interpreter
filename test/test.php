@@ -89,6 +89,23 @@ try {
     echo $e->getMessage() . "<br/>";
 }
 
+
+$code = '
+(int)(5 / 2);
+';
+echo "type casting<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 2) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage() . "<br/>";
+}
+
 $code = '
 a = 15;
 b = 14;

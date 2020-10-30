@@ -217,12 +217,20 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function evaluateSubexpression($char, Atom &$atom)
+    protected function evaluateSubexpressionOrTypeCast($char, Atom &$atom)
     {
         if ($char == '(') {
-            $atom = $this->evaluateBoolStatement();
+            $subResult = $this->evaluateBoolStatement();
             if ($this->readChar() != ')') {
                 throw new \Exception('Syntax error. Wrong number of parentheses.');
+            }                        
+            if ($subResult->getType() == Atom::TYPE_CAST) {
+                // Type casting
+                $atom = $this->parseAtom();
+                $subResult->join('cast', $atom);
+            } else {
+                // Subexpression
+                $atom = $subResult;
             }
             return true;
         }
@@ -296,7 +304,9 @@ class Interpreter
      */
     protected function parseKeywordAtom($varName, Atom &$atom)
     {
-        if ($varName == 'true') {
+        if (in_array($varName, Atom::getCastTypes())) {
+            $atom->setCast($varName);
+        } else if ($varName == 'true') {
             $atom->setBool(true);
         } else if ($varName == 'false') {
             $atom->setBool(false);
@@ -636,7 +646,7 @@ class Interpreter
             }
         }        
 
-        $this->evaluateSubexpression($atomChar, $atom) 
+        $this->evaluateSubexpressionOrTypeCast($atomChar, $atom) 
         || $this->parseVariableAtom($atomChar, $atom)
         || $this->parseArrayAtom($atomChar, $atom)
         || $this->parseNumberAtom($atomChar, $atom)
@@ -861,7 +871,7 @@ class Interpreter
                 case '|':
                     $nextChar = $this->readChar();
                     if ($nextChar == '|') {
-                        if ($result->toString()) {
+                        if ($result->toBool()) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
@@ -876,7 +886,7 @@ class Interpreter
                 case '&':
                     $nextChar = $this->readChar();
                     if ($nextChar == '&') {
-                        if (!$result->toString()) {
+                        if (!$result->toBool()) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
@@ -1098,7 +1108,7 @@ class Interpreter
             if (($char = $this->readChar()) != ';') {
                 throw new \Exception('Unexpected token "' . $char . '".');
             }
-            if ($this->lastResult->toString()) {
+            if ($this->lastResult->toBool()) {
                 if (is_null($afterStatementPos)) {
                     $afterStatementPos = $this->pos;
                 }
@@ -1140,9 +1150,9 @@ class Interpreter
         if (($char = $this->readChar()) != '(') {
             throw new \Exception('Unexpected token "' . $char . '".');
         }
-        $this->evaluateSubexpression($char, $lastIfResult);
+        $this->evaluateSubexpressionOrTypeCast($char, $lastIfResult);
 
-        if ($lastIfResult->toString()) {
+        if ($lastIfResult->toBool()) {
             $this->evaluateBlockOrStatement();
             if ($this->return) {
                 return;
@@ -1169,7 +1179,7 @@ class Interpreter
                 if ($nextChar = $this->readChar(true) != 'f') {
                     throw new \Exception('Unexpected token "' . $nextChar . '".');
                 }
-                if ($lastIfResult->toString()) {
+                if ($lastIfResult->toBool()) {
                     if (($char = $this->readChar()) != '(') {
                         throw new \Exception('Unexpected token "' . $char . '".');
                     }
@@ -1179,8 +1189,8 @@ class Interpreter
                     if (($char = $this->readChar()) != '(') {
                         throw new \Exception('Unexpected token "' . $char . '".');
                     }
-                    $this->evaluateSubexpression($char, $lastIfResult);
-                    if ($lastIfResult->toString()) {
+                    $this->evaluateSubexpressionOrTypeCast($char, $lastIfResult);
+                    if ($lastIfResult->toBool()) {
                         $this->evaluateBlockOrStatement();
                     } else {
                         $this->skipBlockOrStatement();
@@ -1193,7 +1203,7 @@ class Interpreter
                     throw new \Exception('Only 1 else statement can be used after if.');
                 }
                 $elseFound = true;
-                if ($lastIfResult->toString()) {
+                if ($lastIfResult->toBool()) {
                     $this->skipBlockOrStatement();
                 } else {
                     $this->evaluateBlockOrStatement();

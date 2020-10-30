@@ -23,7 +23,7 @@ class Jstring extends Joiner
                 $left->setString($right->getString());
             break;  
             case '=' :
-                if (!$left->isVar()) {
+                if (!$left->getVarRef()) {
                     throw new \Exception('Assignment can only be done to variable');                    
                 } 
                 $left->getVarRef()->setString($right->getString());

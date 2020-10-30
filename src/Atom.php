@@ -14,6 +14,7 @@ class Atom
     const TYPE_ARRAY  = 'array';
     const TYPE_BOOL   = 'bool';
     const TYPE_NOOL   = 'null';
+    const TYPE_CAST   = 'cast';
 
     protected $type;
 
@@ -23,6 +24,7 @@ class Atom
     protected $arrayVal;
     protected $boolVal;
     protected $noolVal;
+    protected $castVal;
 
     protected $varRef;
 
@@ -54,6 +56,10 @@ class Atom
             $this->type = self::TYPE_NOOL;
             $this->noolVal = $val;
           break;
+          case self::TYPE_CAST :
+            $this->type = self::TYPE_CAST;
+            $this->castVal = $val;
+          break;
           default :
             throw new \Exception('Not supported atom type ' . $type);
           break;
@@ -64,6 +70,18 @@ class Atom
       }
     }
 
+    public static function getCastTypes()
+    {
+      return [
+        self::TYPE_INT,
+        self::TYPE_DOUBLE,
+        self::TYPE_STRING,
+        self::TYPE_ARRAY,
+        self::TYPE_BOOL,
+        self::TYPE_NOOL
+      ];
+    }
+
     public function setVarRef(Atom $atom)
     {
       $this->varRef = $atom;
@@ -72,11 +90,6 @@ class Atom
     public function getVarRef()
     {
       return $this->varRef;
-    }
-
-    public function isVar()
-    {
-      return $this->varRef !== null;
     }
 
     protected static $joiners = array (
@@ -278,6 +291,39 @@ class Atom
           'instance' => NULL,
         ),
       ),
+      'cast' => 
+      array (
+        'int' => 
+        array (
+          'class' => 'Vvoina\\Zakerzon\\Atom\\Jcast\\Jint',
+          'instance' => NULL,
+        ),
+        'double' => 
+        array (
+          'class' => 'Vvoina\\Zakerzon\\Atom\\Jcast\\Jdouble',
+          'instance' => NULL,
+        ),
+        'string' => 
+        array (
+          'class' => 'Vvoina\\Zakerzon\\Atom\\Jcast\\Jstring',
+          'instance' => NULL,
+        ),
+        'array' => 
+        array (
+          'class' => 'Vvoina\\Zakerzon\\Atom\\Jcast\\Jarray',
+          'instance' => NULL,
+        ),
+        'bool' => 
+        array (
+          'class' => 'Vvoina\\Zakerzon\\Atom\\Jcast\\Jbool',
+          'instance' => NULL,
+        ),
+        'null' => 
+        array (
+          'class' => 'Vvoina\\Zakerzon\\Atom\\Jcast\\Jnull',
+          'instance' => NULL,
+        ),
+      )
     );
 
     protected function clearVal()
@@ -300,6 +346,9 @@ class Atom
             break;
             case self::TYPE_NOOL :
               $this->noolVal = null;
+            break;
+            case self::TYPE_CAST :
+              $this->castVal = null;
             break;
         }        
     }    
@@ -378,6 +427,13 @@ class Atom
         $this->type = self::TYPE_NOOL;        
     }
 
+    public function setCast($val) 
+    {
+        $this->clearVal();
+        $this->castVal = $val;
+        $this->type = self::TYPE_CAST;        
+    }
+
     /**
      * @return int
      */
@@ -439,7 +495,15 @@ class Atom
         throw new \Exception('Wrong atom type');
       }
       return $this->noolVal;
-    }    
+    } 
+    
+    public function getCast() 
+    {
+      if ($this->type != self::TYPE_CAST) {
+        throw new \Exception('Wrong atom type');
+      }
+      return $this->castVal;
+    } 
 
     public function issetAt($key)
     {
@@ -468,6 +532,33 @@ class Atom
       return $this->arrayVal[$key] = $val;
     }
 
+    public function toBool()
+    {
+      switch ($this->type) {
+        case self::TYPE_INT :
+          return $this->intVal > 0;
+        break;
+        case self::TYPE_DOUBLE :
+          return $this->doubleVal > 0;
+        break;
+        case self::TYPE_STRING :
+          return $this->stringVal != '';
+        break;
+        case self::TYPE_ARRAY :
+          return count($this->arrayVal) > 0;
+        break;
+        case self::TYPE_BOOL :
+          return $this->boolVal;
+        break;
+        case self::TYPE_NOOL :
+          return false;
+        break;
+        case self::TYPE_CAST :
+          return $this->castVal != '';
+        break;
+      }
+    }
+
     public function toString()
     {
       switch ($this->type) {
@@ -489,12 +580,15 @@ class Atom
         case self::TYPE_NOOL :
           return (string) $this->noolVal;
         break;
-    }
+        case self::TYPE_CAST :
+          return (string) $this->castVal;
+        break;
+      }
     }
 
     public function preOperator($operator)
     {
-      if ($this->isVar()) {
+      if ($this->getVarRef()) {
         $this->getVarRef()->preOperator($operator);
       }  
       switch ($operator) {
@@ -551,7 +645,7 @@ class Atom
 
     public function postOperator($operator)
     {      
-      if ($this->isVar()) {
+      if ($this->getVarRef()) {
         $this->getVarRef()->postOperator($operator);
       }
       switch ($operator) {
@@ -589,7 +683,7 @@ class Atom
 
     public function unaryOperator($operator)
     {
-      if ($this->isVar()) {
+      if ($this->getVarRef()) {
         $this->getVarRef()->unaryOperator($operator);
       }
       switch ($operator) {
