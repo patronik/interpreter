@@ -16,7 +16,7 @@ class Jdouble extends Joiner
 
     public function join($operator, Atom $left, Atom $right)
     {
-        $this->validate($operator, $right->getType());
+        $this->validate($operator);
         
         switch ($operator) {
             case '+' :
