@@ -20,7 +20,25 @@ try {
     echo ($res == 4) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
+}
+
+$code = '
+if (false || 1) {
+    a = 2;
+}
+';
+echo "keyword atom<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 2) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -36,7 +54,23 @@ try {
     echo ($res == 1) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
+}
+
+$code = '
+(2 + 2 * 5) + 1;
+';
+echo "subexpression<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 13) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -52,7 +86,24 @@ try {
     echo ($res == 1.25) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
+}
+
+
+$code = '
+(int)(5 / 2);
+';
+echo "type casting<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 2) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -70,7 +121,7 @@ try {
     echo ($res == 43) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -90,10 +141,24 @@ try {
     echo ($res == 1) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
-
+$code = '
+2 in [1,2];
+';
+echo "in array<br/>";
+echo "code: <b>" . nl2br($code) . "</b>";
+try {
+    $inter = new Interpreter();
+    $inter->setReturnLast(true);
+    $res = $inter->evaluate($code);
+    echo "res: " . $res . "<br/>";
+    echo ($res == 1) ? 'OK' : 'FAIL!';
+    echo "<br/><br/>";
+} catch (Exception $e) {
+    echo $e->getMessage() . "<br/>";
+}
 
 $code = '
 if (2 > 1) {
@@ -112,7 +177,7 @@ try {
     echo ($res == 5) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -135,7 +200,7 @@ try {
     echo ($res == 8) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 
@@ -155,7 +220,7 @@ try {
     echo ($res == 10) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -171,7 +236,7 @@ try {
     echo ($res == 1) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }
 
 $code = '
@@ -211,5 +276,5 @@ try {
     echo ($res == 39) ? 'OK' : 'FAIL!';
     echo "<br/><br/>";
 } catch (Exception $e) {
-    echo $e->getMessage();
+    echo $e->getMessage() . "<br/>";
 }

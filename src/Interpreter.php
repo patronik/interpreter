@@ -2,6 +2,8 @@
 
 namespace Vvoina\Zakerzon;
 
+use Vvoina\Zakerzon\Atom;
+
 /**
  * Class Interpreter
  * @author Vasyl Voina <vasyl.voina@gmail.com>
@@ -176,44 +178,6 @@ class Interpreter
     }
 
     /**
-     * Before math atom is returned, some pre operations can be performed
-     *
-     * @param $operator
-     * @param $val
-     * @param $varRef
-     * @return int
-     */
-    protected function applyPreOperator($operator, $val, array &$varRef = [])
-    {
-        switch ($operator) {
-            case '-' :
-                if ($varRef['is_set']) {
-                    $varRef['ref'] = -$varRef;
-                }
-                return -$val;
-                break;
-            case '+' :
-                if ($varRef['is_set']) {
-                    $varRef['ref'] = +$varRef;
-                }
-                return +$val;
-                break;
-            case '++' :
-                if ($varRef['is_set']) {
-                    ++$varRef['ref'];
-                }
-                return ++$val;
-                break;
-            case '--' :
-                if ($varRef['is_set']) {
-                    --$varRef['ref'];
-                }
-                return --$val;
-                break;
-        }
-    }
-
-    /**
      * @param $char
      * @param $varName
      * @return bool
@@ -249,16 +213,24 @@ class Interpreter
 
     /**
      * @param $char
-     * @param $atom
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function evaluateSubexpression($char, &$atom)
+    protected function evaluateSubexpressionOrTypeCast($char, Atom &$atom)
     {
         if ($char == '(') {
-            $atom = $this->evaluateBoolStatement();
+            $subResult = $this->evaluateBoolStatement();
             if ($this->readChar() != ')') {
                 throw new \Exception('Syntax error. Wrong number of parentheses.');
+            }                        
+            if ($subResult->getType() == Atom::TYPE_CAST) {
+                // Type casting
+                $atom = $this->parseAtom();
+                $subResult->join('cast', $atom);
+            } else {
+                // Subexpression
+                $atom = $subResult;
             }
             return true;
         }
@@ -269,11 +241,11 @@ class Interpreter
      * Parse array
      *
      * @param $char
-     * @param $atom
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseArrayAtom($char, &$atom)
+    protected function parseArrayAtom($char, Atom $atom)
     {
         if ($char != '[') {
             return false;
@@ -289,13 +261,25 @@ class Interpreter
                 $nextChar = $this->readChar();
                 if ($nextChar == '>') {
                     $arrayVal = $this->evaluateBoolExpression();
-                    if (!is_numeric($keyOrVal) && !is_string($keyOrVal)) {
-                        throw new \Exception('Only string and integer array keys are supported.');
+                    if (!in_array($keyOrVal->getType(), ['string', 'int', 'double'])) {
+                        throw new \Exception('Only string and numeric array keys are supported.');
                     }
-                    if (is_numeric($keyOrVal) && $keyOrVal >= $implicitKey) {
-                        $implicitKey = $keyOrVal + 1;
+                    if ($keyOrVal->getType() == 'int' 
+                        && $keyOrVal->getInt() >= $implicitKey) 
+                    {
+                        $implicitKey = $keyOrVal->getInt() + 1;
                     }
-                    $array[$keyOrVal] = $arrayVal;
+                    switch ($keyOrVal->getType()) {
+                        case 'int' :
+                            $array[$keyOrVal->getInt()] = $arrayVal;
+                        break;
+                        case 'double' :
+                            $array[$keyOrVal->getDouble()] = $arrayVal;
+                        break;
+                        case 'string' :
+                            $array[$keyOrVal->getString()] = $arrayVal;
+                        break;
+                    }                    
                     $nextChar = $this->readChar();
                 } else {
                     throw new \Exception('Unexpected token "' . $nextChar . '".');
@@ -307,18 +291,40 @@ class Interpreter
             throw new \Exception('Unexpected token "' . $nextChar . '".');
         }
 
-        $atom = $array;
+        $atom->setArray($array);
 
         return true;
     }
 
     /**
      * @param $varName
-     * @param $atom
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseFunctionCallAtom($varName, &$atom)
+    protected function parseKeywordAtom($varName, Atom &$atom)
+    {
+        if (in_array($varName, Atom::getCastTypes())) {
+            $atom->setCast($varName);
+        } else if ($varName == 'true') {
+            $atom->setBool(true);
+        } else if ($varName == 'false') {
+            $atom->setBool(false);
+        }  else if ($varName == 'null') {
+            $atom->setNool(null);          
+        } else {
+            return false;  
+        }      
+        return true;  
+    }
+
+    /**
+     * @param $varName
+     * @param Atom $atom
+     * @return bool
+     * @throws Exception
+     */
+    protected function parseFunctionCallAtom($varName, Atom &$atom)
     {
         // check if function exists
         if (!isset($this->functions[$varName])) {
@@ -365,7 +371,6 @@ class Interpreter
         $this->pos = $this->functions[$varName]['pos'];
         $this->return = false;
 
-        $atom = null;
         $this->evaluateBlockOrStatement();
         if ($this->return) {
             $atom = $this->lastResult;
@@ -383,12 +388,11 @@ class Interpreter
 
     /**
      * @param $varName
-     * @param $atom
-     * @param array $varRef
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseArrayElementAtom($varName, &$atom, array &$varRef = [])
+    protected function parseArrayElementAtom($varName, Atom &$atom)
     {
         // array element
         $char = $this->readChar();
@@ -399,16 +403,13 @@ class Interpreter
 
         $elementKeys = [];
         do {
-            $key = $this->evaluateBoolExpression();
+            $keyAtom = $this->evaluateBoolExpression();
 
-            if (is_null($key)) {
-                throw new \Exception('Failed to parse array key.');
-            }
-            if (!is_numeric($key) && !is_string($key)) {
+            if (!in_array($keyAtom->getType(), ['string', 'int', 'double'])) {
                 throw new \Exception('Only string and integer array keys are supported.');
             }
 
-            $elementKeys[] = $key;
+            $elementKeys[] = $keyAtom;
 
             $char = $this->readChar();
             if (is_null($char)) {
@@ -426,58 +427,56 @@ class Interpreter
         $storage =& $this->getStorageRef();
         // initialize to empty array if not exists
         if (!isset($storage[$varName])) {
-            $storage[$varName] = [];
+            $storage[$varName] = new Atom('array', []);
         }
-        $target =& $storage[$varName];
-        foreach ($elementKeys as $key => $elementKey) {
-            if ($key < (count($elementKeys) - 1)) {
-                if (!isset($target[$elementKey])) {
-                    $target[$elementKey] = [];
+        $target = $storage[$varName];
+        foreach ($elementKeys as $key => $elementKeyAtom) {
+            if ($key < (count($elementKeys) - 1)) {                
+                if (!$target->issetAt($elementKeyAtom->toString())) {
+                    $target->createAt($elementKeyAtom->toString(), new Atom('array', []));
                 }
             }
-            $target =& $target[$elementKey];
+            $target = $target->elementAt($elementKeyAtom->toString());
         }
 
-        $varRef['is_set'] = true;
-        $varRef['ref'] =& $target;
-
-        $atom = $target;
+        $atom = clone $target;
+        $atom->setVarRef($target);
         return true;
     }
 
     /**
      * @param $char
-     * @param $atom
-     * @param array $varRef
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseVariableAtom($char, &$atom, array &$varRef = [])
+    protected function parseVariableAtom($char, Atom &$atom)
     {
         // variable
         $varName = null;
         if ($this->parseCharacterSequence($char, $varName)) {
+            // try to parse keyword atom
+            if ($this->parseKeywordAtom($varName, $atom)) {
+                return true;
+            }
+
             // try to process function call atom
             if ($this->parseFunctionCallAtom($varName, $atom)) {
                 return true;
             }
 
             // try to parse array element
-            if ($this->parseArrayElementAtom($varName, $atom, $varRef)) {
+            if ($this->parseArrayElementAtom($varName, $atom)) {
                 return true;
             }
 
             $storage =& $this->getStorageRef();
             // initialize to null if not exists
             if (!isset($storage[$varName])) {
-                $storage[$varName] = null;
+                $storage[$varName] = new Atom();
             }
-            $target =& $storage[$varName];
-
-            $varRef['is_set'] = true;
-            $varRef['ref'] =& $target;
-
-            $atom = $target;
+            $atom = clone $storage[$varName]; 
+            $atom->setVarRef($storage[$varName]);
             return true;
         }
         return false;
@@ -485,25 +484,26 @@ class Interpreter
 
     /**
      * @param $char
-     * @param $atom
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseSingleQuotedStringAtom($char, &$atom)
+    protected function parseSingleQuotedStringAtom($char, Atom $atom)
     {
         // string in single quotes
         if ($char == "'") {
-            $atom = '';
+            $string = '';
             while (!is_null($char = $this->readChar(false, true))) {
                 if ($char != "'") {
-                    $atom .= $char;
+                    $string .= $char;
                     continue;
-                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
-                    $atom[strlen($atom) - 1] = '\'';
+                } else if (strlen($string) > 0 && $string[strlen($string) - 1] == "\\") {
+                    $string[strlen($string) - 1] = '\'';
                     continue;
                 }
                 break;
             }
+            $atom->setString($string);
             return true;
         }
         return false;
@@ -511,25 +511,26 @@ class Interpreter
 
     /**
      * @param $char
-     * @param $atom
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseDoubleQuotedStringAtom($char, &$atom)
+    protected function parseDoubleQuotedStringAtom($char, Atom $atom)
     {
         // string in double quotes
         if ($char == "\"") {
-            $atom = "";
+            $string = "";
             while (!is_null($char = $this->readChar(false, true))) {
                 if ($char != "\"") {
-                    $atom .= $char;
+                    $string .= $char;
                     continue;
-                } else if (strlen($atom) > 0 && $atom[strlen($atom) - 1] == "\\") {
-                    $atom[strlen($atom) - 1] = "\"";
+                } else if (strlen($string) > 0 && $string[strlen($string) - 1] == "\\") {
+                    $string[strlen($string) - 1] = "\"";
                     continue;
                 }
                 break;
             }
+            $atom->setString($string);
             return true;
         }
         return false;
@@ -537,30 +538,31 @@ class Interpreter
 
     /**
      * @param $char
-     * @param $atom
+     * @param Atom $atom
      * @return bool
      * @throws Exception
      */
-    protected function parseNumberAtom($char, &$atom)
+    protected function parseNumberAtom($char, Atom $atom)
     {
         // number
+        $number = null;
         $hasDot = false;
         $asciiCode = ord($char);
         if ($asciiCode >= 48 && $asciiCode <= 57) { // 0-9
-            $atom = $char;
+            $number = $char;
             while (!is_null($char = $this->readChar(false, true))) {
                 $asciiCode = ord($char);
                 if ($asciiCode >= 48
                     && $asciiCode <= 57)  // 0-9
                 {
-                    $atom .= $char;
+                    $number .= $char;
                     continue;
                 } else if ($asciiCode == 46) { // .
                     if ($hasDot) {
                         throw new \Exception('Unexpected token "' . $char . '".');
                     }
                     $hasDot = true;
-                    $atom .= $char;
+                    $number .= $char;
                     continue;
                 }
                 if (!$this->isSpace($char)) {
@@ -571,6 +573,11 @@ class Interpreter
             if ($asciiCode == 46) { // . at the end of number
                 throw new \Exception('Unexpected token "' . $char . '".');
             }
+            if ($hasDot) {
+                $atom->setDouble($number);
+            } else {
+                $atom->setInt($number);
+            }            
             return true;
         }
         return false;
@@ -579,7 +586,7 @@ class Interpreter
     /**
      * Like operator is called, check result against regular expression
      *
-     * @param $result
+     * @param Atom
      * @throws Exception
      */
     protected function evaluateLikeExpression(&$result)
@@ -590,19 +597,18 @@ class Interpreter
                 throw new \Exception('Unexpected token "' . $nextChar . '".');
             }
         }
-        $result = preg_match('#' . $this->evaluateBoolExpression() . '#', $result);
+        $result->join('like', $this->evaluateBoolExpression());
     }
 
     /**
      * The atomic (non dividable) part of expression
      *
-     * @param array $varRef
-     * @return bool|int|mixed|string|null
+     * @return Atom
      * @throws Exception
      */
-    protected function parseAtom(array &$varRef = [])
+    protected function parseAtom()
     {
-        $atom = null;
+        $atom = new Atom();
         $boolInversion = false;
         $preOperator = false;
 
@@ -638,25 +644,21 @@ class Interpreter
                 $preOperator .= $atomChar;
                 $atomChar = $this->readChar();
             }
-        }
+        }        
 
-        // handle subexpression
-        if ($this->evaluateSubexpression($atomChar, $atom)) {
-            return $atom;
-        }
-
-        $this->parseVariableAtom($atomChar, $atom, $varRef)
+        $this->evaluateSubexpressionOrTypeCast($atomChar, $atom) 
+        || $this->parseVariableAtom($atomChar, $atom)
         || $this->parseArrayAtom($atomChar, $atom)
         || $this->parseNumberAtom($atomChar, $atom)
         || $this->parseSingleQuotedStringAtom($atomChar, $atom)
         || $this->parseDoubleQuotedStringAtom($atomChar, $atom);
 
         if ($preOperator) {
-            $atom = $this->applyPreOperator($preOperator, $atom, $varRef);
+            $atom->preOperator($preOperator);
         }
 
         if ($boolInversion) {
-            $atom = !$atom;
+            $atom = $atom->preOperator('!');
         }
 
         return $atom;
@@ -665,39 +667,35 @@ class Interpreter
     /**
      * Single math block
      *
-     * @return int
+     * @return Atom
      */
     protected function evaluateMathBlock()
     {
-        $varRef = ['is_set' => false, 'ref' => null];
-        $result = $this->parseAtom($varRef);
+        $result = $this->parseAtom();
         while ($atomOp = $this->readChar(true)) {
             switch ($atomOp) {
                 case '*':
-                    $result *= $this->parseAtom($varRef);
+                    $result->join('*', $this->parseAtom());
                 break;
                 case '/':
-                    $result /= $this->parseAtom($varRef);
+                    $result->join('/', $this->parseAtom());
                 break;
                 case '.':
-                    $result .= $this->parseAtom($varRef);
+                    $result->join('.', $this->parseAtom());
                 break;
                 case '%':
-                    $result %= $this->parseAtom($varRef);
+                    $result->join('%', $this->parseAtom());
                 break;
                 case '+':
                     $nextChar = $this->readChar();
-                    if ($nextChar == '+') {
-                        if (!$varRef['is_set']) {
-                            throw new \Exception('Assignment target is missing');
-                        }
-                        $varRef['ref']++;
-                    } else if ($nextChar == '=') {
-                        if (!$varRef['is_set']) {
-                            throw new \Exception('Assignment target is missing');
-                        }
-                        $varRef['ref'] = $varRef['ref'] + $this->evaluateBoolStatement();
-                        $result = $varRef['ref'];
+                    if ($nextChar == '+') {                        
+                        $result->postOperator('++');
+                    } else if ($nextChar == '=') {                        
+                        $result->join(
+                            '=', $result->join(
+                                    '+', $this->evaluateBoolStatement()
+                                )
+                        );
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
@@ -707,16 +705,13 @@ class Interpreter
                 case '-':
                     $nextChar = $this->readChar();
                     if ($nextChar == '-') {
-                        if (!$varRef['is_set']) {
-                            throw new \Exception('Assignment target is missing');
-                        }
-                        $varRef['ref']--;
+                        $result->postOperator('--');
                     } else if ($nextChar == '=') {
-                        if (!$varRef['is_set']) {
-                            throw new \Exception('Assignment target is missing');
-                        }
-                        $varRef['ref'] = $varRef['ref'] - $this->evaluateBoolStatement();
-                        $result = $varRef['ref'];
+                        $result->join(
+                            '=', $result->join(
+                                    '-', $this->evaluateBoolStatement()
+                                )
+                        );
                     } else {
                         // Lower lever operator
                         $this->unreadChar(2);
@@ -735,12 +730,10 @@ class Interpreter
                         break;
                     } else {
                         $this->unreadChar();
-                        // assign result to target (left side)
-                        if (!$varRef['is_set']) {
-                            throw new \Exception('Assignment target is missing');
-                        }
-                        $varRef['ref'] = $this->evaluateBoolStatement();
-                        $result = $varRef['ref'];
+                        // execute assignment statement
+                        $result->join(
+                            '=', $this->evaluateBoolStatement()
+                        );
                     }
                     break;
                 // Lower lever operators
@@ -774,7 +767,7 @@ class Interpreter
     /**
      * Single boolean expression that consists from one or more math blocks
      *
-     * @return bool|int
+     * @return Atom
      * @throws Exception
      */
     protected function evaluateBoolExpression()
@@ -783,15 +776,15 @@ class Interpreter
         while ($mathOp = $this->readChar(true)) {
             switch ($mathOp) {
                 case '+':
-                    $result += $this->evaluateMathBlock();
+                    $result->join('+', $this->evaluateMathBlock());
                 break;
-                case '-':
-                    $result -= $this->evaluateMathBlock();
+                case '-':                    
+                    $result->join('-', $this->evaluateMathBlock());
                 break;
                 case '=':
                     $nextChar = $this->readChar();
-                    if ($nextChar == '=') {
-                        $result = $result == $this->evaluateMathBlock();
+                    if ($nextChar == '=') {                        
+                        $result->join('==', $this->evaluateMathBlock());
                     } elseif ($nextChar == '>')  {
                         $this->unreadChar(2);
                         return $result;
@@ -803,37 +796,33 @@ class Interpreter
                 case '!':
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
-                        $result = $result != $this->evaluateMathBlock();
+                        $result->join('!=', $this->evaluateMathBlock());
                     } else {
                         throw new \Exception('Unexpected token "' . $mathOp . $nextChar . '".');
                     }
                 break;
                 case '>':
                     $nextChar = $this->readChar();
-                    if ($nextChar == '=') {
-                        $result = $result >= $this->evaluateMathBlock();
+                    if ($nextChar == '=') {                        
+                        $result->join('>=', $this->evaluateMathBlock());
                     } else {
-                        $this->unreadChar();
-                        $result = $result > $this->evaluateMathBlock();
+                        $this->unreadChar();                        
+                        $result->join('>', $this->evaluateMathBlock());
                     }
                 break;
                 case '<':
                     $nextChar = $this->readChar();
-                    if ($nextChar == '=') {
-                        $result = $result <= $this->evaluateMathBlock();
+                    if ($nextChar == '=') {                        
+                        $result->join('<=', $this->evaluateMathBlock());
                     } else {
-                        $this->unreadChar();
-                        $result = $result < $this->evaluateMathBlock();
+                        $this->unreadChar();                        
+                        $result->join('<', $this->evaluateMathBlock());
                     }
                     break;
                 case 'i': // find in set
                     $nextChar = $this->readChar(true);
-                    if ($nextChar == 'n') {
-                        $haystack = $this->evaluateMathBlock();
-                        if (!is_array($haystack)) {
-                            throw new \Exception('Haystack is not an array.');
-                        }
-                        $result = in_array($result, $haystack);
+                    if ($nextChar == 'n') {                        
+                        $result->join('in', $this->evaluateMathBlock());
                     } else {
                         throw new \Exception('Unexpected token "' . $mathOp . $nextChar . '".');
                     }
@@ -867,7 +856,7 @@ class Interpreter
     /**
      * One or more math boolean expression
      *
-     * @return bool|int
+     * @return Atom
      * @throws Exception
      */
     protected function evaluateBoolStatement()
@@ -882,14 +871,14 @@ class Interpreter
                 case '|':
                     $nextChar = $this->readChar();
                     if ($nextChar == '|') {
-                        if ($result == true) {
+                        if ($result->toBool()) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
                             $this->unreadChar();
-                            return (bool) $result;
+                            return $result;
                         }
-                        $result = (bool) ($result || $this->evaluateBoolExpression());
+                        $result->join('||', $this->evaluateBoolExpression());
                     } else {
                         throw new \Exception('Unexpected token "' . $booleanOp . $nextChar . '".');
                     }
@@ -897,14 +886,14 @@ class Interpreter
                 case '&':
                     $nextChar = $this->readChar();
                     if ($nextChar == '&') {
-                        if ($result == false) {
+                        if (!$result->toBool()) {
                             // in order to reduce amount of calculations,
                             // skip the rest of expression and return result
                             $this->rewindUntil([';', ')'], '(');
                             $this->unreadChar();
-                            return (bool) $result;
+                            return $result;
                         }
-                        $result = (bool) ($result && $this->evaluateBoolExpression());
+                        $result->join('&&', $this->evaluateBoolExpression());
                     } else {
                         throw new \Exception('Unexpected token "' . $booleanOp . $nextChar . '".');
                     }
@@ -1119,7 +1108,7 @@ class Interpreter
             if (($char = $this->readChar()) != ';') {
                 throw new \Exception('Unexpected token "' . $char . '".');
             }
-            if ($this->lastResult) {
+            if ($this->lastResult->toBool()) {
                 if (is_null($afterStatementPos)) {
                     $afterStatementPos = $this->pos;
                 }
@@ -1157,13 +1146,13 @@ class Interpreter
      */
     protected function evaluateIfStructure()
     {
-        $lastIfResult = null;
+        $lastIfResult = new Atom();
         if (($char = $this->readChar()) != '(') {
             throw new \Exception('Unexpected token "' . $char . '".');
         }
-        $this->evaluateSubexpression($char, $lastIfResult);
+        $this->evaluateSubexpressionOrTypeCast($char, $lastIfResult);
 
-        if ($lastIfResult) {
+        if ($lastIfResult->toBool()) {
             $this->evaluateBlockOrStatement();
             if ($this->return) {
                 return;
@@ -1190,7 +1179,7 @@ class Interpreter
                 if ($nextChar = $this->readChar(true) != 'f') {
                     throw new \Exception('Unexpected token "' . $nextChar . '".');
                 }
-                if ($lastIfResult) {
+                if ($lastIfResult->toBool()) {
                     if (($char = $this->readChar()) != '(') {
                         throw new \Exception('Unexpected token "' . $char . '".');
                     }
@@ -1200,8 +1189,8 @@ class Interpreter
                     if (($char = $this->readChar()) != '(') {
                         throw new \Exception('Unexpected token "' . $char . '".');
                     }
-                    $this->evaluateSubexpression($char, $lastIfResult);
-                    if ($lastIfResult) {
+                    $this->evaluateSubexpressionOrTypeCast($char, $lastIfResult);
+                    if ($lastIfResult->toBool()) {
                         $this->evaluateBlockOrStatement();
                     } else {
                         $this->skipBlockOrStatement();
@@ -1214,7 +1203,7 @@ class Interpreter
                     throw new \Exception('Only 1 else statement can be used after if.');
                 }
                 $elseFound = true;
-                if ($lastIfResult) {
+                if ($lastIfResult->toBool()) {
                     $this->skipBlockOrStatement();
                 } else {
                     $this->evaluateBlockOrStatement();
@@ -1357,12 +1346,8 @@ class Interpreter
             }
         }
 
-        if ($this->return) {
-            return $this->lastResult;
-        }
-
-        if ($this->returnLast) {
-            return $this->lastResult;
+        if ($this->return || $this->returnLast) {
+            return $this->lastResult->toString();
         }
     }
 }

@@ -13,14 +13,18 @@ Sometimes you just want to know how things work. Then you read about interpreter
 4. Conditional operator
 5. For loop
 6. Subprograms (functions)
+7. Type system
 
 ## Usage
 
 ```
 <?php
+require __DIR__.'/../vendor/autoload.php';
 
-require_once 'interpreter.php';
+use Vvoina\Zakerzon\Interpreter;
 
+ini_set('display_errors', 1);
+error_reporting(E_ALL);
 $inter = new Interpreter();
 try {
     $res = $inter->evaluate(<<<CODE
