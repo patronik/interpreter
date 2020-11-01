@@ -25,10 +25,10 @@ class Jdouble extends Joiner
                 );
             break;
             case '=' :
-                if (!$left->getVarRef()) {
+                if (!$left->getVar()) {
                     throw new \Exception('Assignment can only be done to variable');                    
                 } 
-                $left->getVarRef()->setString((string)$right->getDouble());
+                $left->getVar()->setString((string)$right->getDouble());
                 $left->setString((string)$right->getDouble());
             break;            
         }

@@ -440,7 +440,7 @@ class Interpreter
         }
 
         $atom = clone $target;
-        $atom->setVarRef($target);
+        $atom->setVar($target);
         return true;
     }
 
@@ -476,7 +476,7 @@ class Interpreter
                 $storage[$varName] = new Atom();
             }
             $atom = clone $storage[$varName]; 
-            $atom->setVarRef($storage[$varName]);
+            $atom->setVar($storage[$varName]);
             return true;
         }
         return false;

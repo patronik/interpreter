@@ -82,12 +82,12 @@ class Atom
       ];
     }
 
-    public function setVarRef(Atom $atom)
+    public function setVar(Atom $atom)
     {
       $this->varRef = $atom;
     }
 
-    public function getVarRef()
+    public function getVar()
     {
       return $this->varRef;
     }
@@ -588,8 +588,8 @@ class Atom
 
     public function preOperator($operator)
     {
-      if ($this->getVarRef()) {
-        $this->getVarRef()->preOperator($operator);
+      if ($this->getVar()) {
+        $this->getVar()->preOperator($operator);
       }  
       switch ($operator) {
           case '++':
@@ -645,8 +645,8 @@ class Atom
 
     public function postOperator($operator)
     {      
-      if ($this->getVarRef()) {
-        $this->getVarRef()->postOperator($operator);
+      if ($this->getVar()) {
+        $this->getVar()->postOperator($operator);
       }
       switch ($operator) {
           case '++':
@@ -683,8 +683,8 @@ class Atom
 
     public function unaryOperator($operator)
     {
-      if ($this->getVarRef()) {
-        $this->getVarRef()->unaryOperator($operator);
+      if ($this->getVar()) {
+        $this->getVar()->unaryOperator($operator);
       }
       switch ($operator) {
         case '-':

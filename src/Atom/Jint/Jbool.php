@@ -35,10 +35,10 @@ class Jbool extends Joiner
                 );
             break;
             case '=' :
-                if (!$left->getVarRef()) {
+                if (!$left->getVar()) {
                     throw new \Exception('Assignment can only be done to variable');                    
                 } 
-                $left->getVarRef()->setInt((int)$right->getBool());
+                $left->getVar()->setInt((int)$right->getBool());
                 $left->setInt((int)$right->getBool()); 
             break;
         }
