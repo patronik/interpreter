@@ -30,10 +30,10 @@ class Jstring extends Joiner
                 );
             break; 
             case '=' :
-                if (!$left->getVarRef()) {
+                if (!$left->getVar()) {
                     throw new \Exception('Assignment can only be done to variable');                    
                 } 
-                $left->getVarRef()->setString($right->getString());
+                $left->getVar()->setString($right->getString());
                 $left->setString($right->getString()); 
             break;            
         }

@@ -27,7 +27,7 @@ class Jint extends Joiner
                         $right->setString((string) $right->getInt());
                     break;
                     case 'double' :
-                        $right->setInt((int) $right->getInt());
+                        $right->setDouble((double) $right->getInt());
                     break;
                     case 'bool' :
                         $right->setBool((bool) $right->getInt());

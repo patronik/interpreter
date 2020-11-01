@@ -83,10 +83,10 @@ class Jdouble extends Joiner
                 );
             break;
             case '=' :
-                if (!$left->getVarRef()) {
+                if (!$left->getVar()) {
                     throw new \Exception('Assignment can only be done to variable');                    
                 } 
-                $left->getVarRef()->setInt((int)$right->getDouble());
+                $left->getVar()->setInt((int)$right->getDouble());
                 $left->setInt((int)$right->getDouble());
             break;
         }
