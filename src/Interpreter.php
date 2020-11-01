@@ -217,7 +217,7 @@ class Interpreter
      * @return bool
      * @throws Exception
      */
-    protected function evaluateSubexpressionOrTypeCast($char, Atom &$atom)
+    protected function evaluateSubexprOrTypeCast($char, Atom &$atom)
     {
         if ($char == '(') {
             $subResult = $this->evaluateBoolStatement();
@@ -646,7 +646,7 @@ class Interpreter
             }
         }        
 
-        $this->evaluateSubexpressionOrTypeCast($atomChar, $atom) 
+        $this->evaluateSubexprOrTypeCast($atomChar, $atom) 
         || $this->parseVariableAtom($atomChar, $atom)
         || $this->parseArrayAtom($atomChar, $atom)
         || $this->parseNumberAtom($atomChar, $atom)
@@ -718,13 +718,15 @@ class Interpreter
                         return $result;
                     }
                     break;
-                case '=': // equality == or assignment or array key-val separator (=>)
+                case '=': 
                     $nextChar = $this->readChar();
                     if ($nextChar == '=') {
+                        // equality
                         $this->unreadChar();
                         return $result;
                         break;
                     } elseif ($nextChar == '>')  {
+                        // key-val separator
                         $this->unreadChar(2);
                         return $result;
                         break;
@@ -1150,7 +1152,7 @@ class Interpreter
         if (($char = $this->readChar()) != '(') {
             throw new \Exception('Unexpected token "' . $char . '".');
         }
-        $this->evaluateSubexpressionOrTypeCast($char, $lastIfResult);
+        $this->evaluateSubexprOrTypeCast($char, $lastIfResult);
 
         if ($lastIfResult->toBool()) {
             $this->evaluateBlockOrStatement();
@@ -1189,7 +1191,7 @@ class Interpreter
                     if (($char = $this->readChar()) != '(') {
                         throw new \Exception('Unexpected token "' . $char . '".');
                     }
-                    $this->evaluateSubexpressionOrTypeCast($char, $lastIfResult);
+                    $this->evaluateSubexprOrTypeCast($char, $lastIfResult);
                     if ($lastIfResult->toBool()) {
                         $this->evaluateBlockOrStatement();
                     } else {
