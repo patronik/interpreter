@@ -140,7 +140,7 @@ class Interpreter
      *
      * @param $toLower
      * @param $allChars
-     * @throws Exception
+     * @throws \Exception
      * @return string|null
      */
     protected function readChar($toLower = false, $allChars = false)
@@ -181,7 +181,7 @@ class Interpreter
      * @param $char
      * @param $varName
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseCharacterSequence($char, &$varName)
     {
@@ -215,7 +215,7 @@ class Interpreter
      * @param $char
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateSubexprOrTypeCast($char, Atom &$atom)
     {
@@ -243,7 +243,7 @@ class Interpreter
      * @param $char
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseArrayAtom($char, Atom $atom)
     {
@@ -300,7 +300,7 @@ class Interpreter
      * @param $varName
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseKeywordAtom($varName, Atom &$atom)
     {
@@ -322,7 +322,7 @@ class Interpreter
      * @param $varName
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseFunctionCallAtom($varName, Atom &$atom)
     {
@@ -390,7 +390,7 @@ class Interpreter
      * @param $varName
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseArrayElementAtom($varName, Atom &$atom)
     {
@@ -448,7 +448,7 @@ class Interpreter
      * @param $char
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseVariableAtom($char, Atom &$atom)
     {
@@ -486,7 +486,7 @@ class Interpreter
      * @param $char
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseSingleQuotedStringAtom($char, Atom $atom)
     {
@@ -513,7 +513,7 @@ class Interpreter
      * @param $char
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseDoubleQuotedStringAtom($char, Atom $atom)
     {
@@ -540,7 +540,7 @@ class Interpreter
      * @param $char
      * @param Atom $atom
      * @return bool
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseNumberAtom($char, Atom $atom)
     {
@@ -587,7 +587,7 @@ class Interpreter
      * Like operator is called, check result against regular expression
      *
      * @param Atom
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateLikeExpression(&$result)
     {
@@ -604,7 +604,7 @@ class Interpreter
      * The atomic (non dividable) part of expression
      *
      * @return Atom
-     * @throws Exception
+     * @throws \Exception
      */
     protected function parseAtom()
     {
@@ -770,7 +770,7 @@ class Interpreter
      * Single boolean expression that consists from one or more math blocks
      *
      * @return Atom
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateBoolExpression()
     {
@@ -859,7 +859,7 @@ class Interpreter
      * One or more math boolean expression
      *
      * @return Atom
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateBoolStatement()
     {
@@ -973,7 +973,7 @@ class Interpreter
      * Evaluate block or statement and read terminator symbol
      * @param $stopOnBreak
      *
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateBlockOrStatement($stopOnBreak = false)
     {
@@ -1018,7 +1018,7 @@ class Interpreter
     /**
      * Skip block or statement including terminator symbol
      *
-     * @throws Exception
+     * @throws \Exception
      */
     protected function skipBlockOrStatement()
     {
@@ -1144,7 +1144,7 @@ class Interpreter
     /**
      * Evaluate if structure
      *
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateIfStructure()
     {
@@ -1218,7 +1218,7 @@ class Interpreter
      * Determine statement type and evaluate it
      *
      * @return void
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateStatement()
     {
@@ -1294,7 +1294,7 @@ class Interpreter
      * Statement can be variable assignment, return statement, boolean|math expression etc.
      *
      * @return mixed
-     * @throws Exception
+     * @throws \Exception
      */
     protected function evaluateStatements()
     {
@@ -1324,7 +1324,7 @@ class Interpreter
      * @param $code
      * @param $pos
      * @return mixed
-     * @throws Exception
+     * @throws \Exception
      */
     public function evaluate($code = '', $pos = 0)
     {
